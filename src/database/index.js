@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { database } from '../config';
+import config from '../config/index.js';
 
 /**
  * Classe pour gérer la connexion à la base de données MongoDB
@@ -22,9 +22,10 @@ class Database {
         console.log('Utilisation de la connexion MongoDB existante');
         return this.connection;
       }
+  
 
       console.log('Connexion à MongoDB...');
-      this.connection = await this.mongoose.connect(database.uri);
+      this.connection = await this.mongoose.connect(config.database.uri);
       this.isConnected = true;
       console.log('Connexion à MongoDB établie avec succès');
       return this.connection;
