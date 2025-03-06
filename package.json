@@ -16,5 +16,12 @@
   "bugs": {
     "url": "https://github.com/idealy-ma/m1p12mean-Idealy-Prisca-back/issues"
   },
-  "homepage": "https://github.com/idealy-ma/m1p12mean-Idealy-Prisca-back#readme"
+  "homepage": "https://github.com/idealy-ma/m1p12mean-Idealy-Prisca-back#readme",
+  "dependencies": {
+    "body-parser": "^1.20.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "mongoose": "^8.12.1"
+  }
 }
