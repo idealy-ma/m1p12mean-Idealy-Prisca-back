@@ -1,5 +1,4 @@
 const dotenv = require('dotenv');
-const path = require('path');
 
 // Charger les variables d'environnement
 dotenv.config();
