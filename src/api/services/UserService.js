@@ -2,7 +2,7 @@ const BaseService = require('./BaseService');
 const UserModel = require('../models/User');
 const config = require('../../config');
 const jwt = require('jsonwebtoken');
-
+const bcrypt = require('bcryptjs');
 /**
  * Service pour gérer les utilisateurs
  * Suit le principe d'interface ségrégation (I de SOLID)
@@ -34,6 +34,7 @@ class UserService extends BaseService {
       if (!isPasswordValid) {
         throw new Error('Email ou mot de passe incorrect');
       }
+      user.estActif = true;
 
       // Ne pas renvoyer le mot de passe
       user.motDePasse = undefined;
@@ -101,10 +102,30 @@ class UserService extends BaseService {
       config.jwt.secret, // Utilisation de la clé secrète définie dans config
       { expiresIn: '60d' } // Expiration du token (2 mois)
     );
-  
+    user.token = token;
     return token;
   }
-  
+
+  validateFields = (fields) => {
+    const { nom, prenom, email, motDePasse } = fields;
+    if (!nom || !prenom || !email || !motDePasse) {
+      throw new Error('Veuillez fournir tous les champs requis');
+    }
+  };
+
+  checkIfUserExists = async (email) => {
+    const existingUser = await this.repository.model.findOne({ email });
+    if (existingUser) {
+      throw new Error('Un utilisateur avec cet email existe déjà');
+    }
+  };
+
+  hashPassword = async (motDePasse) => {
+  //chaîne aléatoire ajoutée au mot de passe avant de le hasher
+  const salt = await bcrypt.genSalt(10);
+  return await bcrypt.hash(motDePasse, salt);
+  };
+
 }
 
 module.exports = new UserService(); 
