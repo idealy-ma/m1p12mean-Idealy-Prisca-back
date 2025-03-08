@@ -1,0 +1,31 @@
+{
+  "name": "m1p12mean-idealy-prisca-back",
+  "version": "1.0.0",
+  "description": "Code source du projet backend pour l'application de garage",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/idealy-ma/m1p12mean-Idealy-Prisca-back.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/idealy-ma/m1p12mean-Idealy-Prisca-back/issues"
+  },
+  "homepage": "https://github.com/idealy-ma/m1p12mean-Idealy-Prisca-back#readme",
+  "dependencies": {
+    "body-parser": "^1.20.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "mongoose": "^8.12.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9"
+  }
+}
