@@ -1,5 +1,7 @@
 const BaseService = require('./BaseService');
 const UserModel = require('../models/User');
+const config = require('../../config');
+const jwt = require('jsonwebtoken');
 
 /**
  * Service pour gérer les utilisateurs
@@ -87,6 +89,22 @@ class UserService extends BaseService {
       throw error;
     }
   }
+
+  generateToken(user) {
+    if (!user) {
+      throw new Error('L\'utilisateur est nécessaire pour générer un token');
+    }
+    
+    // Générer le token JWT avec la clé définie dans config
+    const token = jwt.sign(
+      { id: user.id, email: user.email, role: user.role }, // Payload
+      config.jwt.secret, // Utilisation de la clé secrète définie dans config
+      { expiresIn: '60d' } // Expiration du token (2 mois)
+    );
+  
+    return token;
+  }
+  
 }
 
 module.exports = new UserService(); 

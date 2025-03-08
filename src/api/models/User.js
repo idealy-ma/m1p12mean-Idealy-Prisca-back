@@ -29,7 +29,7 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['client', 'responsable_atelier', 'responsable_financier', 'admin'],
+    enum: ['client', 'manager', 'mecanicien'],
     default: 'client'
   },
   telephone: {
@@ -42,7 +42,11 @@ const userSchema = new mongoose.Schema({
   },
   estActif: {
     type: Boolean,
-    default: true
+    default: false
+  },
+  token: {
+    type: String, // Stocke le JWT
+    default: null
   }
 }, {
   timestamps: true, // Ajoute createdAt et updatedAt

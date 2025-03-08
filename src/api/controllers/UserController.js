@@ -1,6 +1,5 @@
 const BaseController = require('./BaseController');
 const UserService = require('../services/UserService');
-
 /**
  * Contrôleur pour gérer les utilisateurs
  * Suit le principe d'interface ségrégation (I de SOLID)
@@ -19,7 +18,6 @@ class UserController extends BaseController {
   login = async (req, res) => {
     try {
       const { email, motDePasse } = req.body;
-      
       if (!email || !motDePasse) {
         return res.status(400).json({
           success: false,
@@ -30,11 +28,11 @@ class UserController extends BaseController {
       const user = await this.service.authenticate(email, motDePasse);
       
       // Ici, vous pourriez générer un token JWT
-      // const token = generateToken(user);
-      
+      const token = this.service.generateToken(user);
+
       res.status(200).json({
         success: true,
-        // token,
+        token,
         data: user
       });
     } catch (error) {
