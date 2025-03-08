@@ -1,7 +1,5 @@
 const BaseController = require('./BaseController');
 const UserService = require('../services/UserService');
-const conf = require('dotenv').config();
-
 /**
  * Contrôleur pour gérer les utilisateurs
  * Suit le principe d'interface ségrégation (I de SOLID)
