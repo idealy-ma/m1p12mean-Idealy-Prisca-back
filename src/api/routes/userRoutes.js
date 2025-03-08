@@ -7,7 +7,7 @@ const router = express.Router();
 
 // Routes publiques
 router.post('/login', UserController.login);
-router.post('/register', UserController.create);
+router.post('/register', UserController.registerUser);
 
 // Routes protégées
 // Décommentez ces lignes une fois le middleware d'authentification implémenté
