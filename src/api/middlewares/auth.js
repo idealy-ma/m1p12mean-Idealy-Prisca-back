@@ -25,7 +25,7 @@ exports.protect = async (req, res, next) => {
 
     try {
       // Vérifier le token
-      const decoded = jwt.verify(token, config.JWT_SECRET);
+      const decoded = jwt.verify(token, config.jwt.secret);
 
       // Ajouter l'utilisateur à la requête
       const user = await UserModel.model.findById(decoded.id);
