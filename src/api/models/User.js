@@ -44,10 +44,6 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-  token: {
-    type: String, // Stocke le JWT
-    default: null
-  }
 }, {
   timestamps: true, // Ajoute createdAt et updatedAt
   toJSON: { virtuals: true },
