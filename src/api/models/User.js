@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const BaseModel = require('./BaseModel');
-
+const bcrypt = require('bcryptjs');
 // Définition du schéma utilisateur
 const userSchema = new mongoose.Schema({
   nom: {
@@ -44,10 +44,6 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-  token: {
-    type: String, // Stocke le JWT
-    default: null
-  }
 }, {
   timestamps: true, // Ajoute createdAt et updatedAt
   toJSON: { virtuals: true },
@@ -56,8 +52,7 @@ const userSchema = new mongoose.Schema({
 
 // Méthode pour vérifier si le mot de passe est correct (à implémenter avec bcrypt)
 userSchema.methods.verifierMotDePasse = function(motDePasseCandidat) {
-  // À implémenter avec bcrypt
-  return motDePasseCandidat === this.motDePasse;
+  return bcrypt.compare(motDePasseCandidat, this.motDePasse);
 };
 
 // Créer le modèle Mongoose

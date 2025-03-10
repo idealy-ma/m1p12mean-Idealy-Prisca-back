@@ -1,11 +1,20 @@
 const express = require('express');
 const userRoutes = require('./userRoutes');
+const managerRoutes = require('./managerRoutes');
+const mecanicienRoutes = require('./mecanicienRoutes');
+const clientRoutes = require('./clientRoutes');
 // Importez d'autres routes ici au fur et à mesure que vous les créez
 
 const router = express.Router();
 
-// Définir les routes de base
+// Routes d'authentification et de gestion des utilisateurs
 router.use('/users', userRoutes);
+
+// Routes spécifiques aux rôles
+router.use('/manager', managerRoutes);
+router.use('/mecanicien', mecanicienRoutes);
+router.use('/client', clientRoutes);
+
 // Ajoutez d'autres routes ici au fur et à mesure que vous les créez
 // router.use('/services', serviceRoutes);
 // router.use('/voitures', voitureRoutes);
