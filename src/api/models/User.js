@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const BaseModel = require('./BaseModel');
-
+const bcrypt = require('bcryptjs');
 // Définition du schéma utilisateur
 const userSchema = new mongoose.Schema({
   nom: {
@@ -56,8 +56,7 @@ const userSchema = new mongoose.Schema({
 
 // Méthode pour vérifier si le mot de passe est correct (à implémenter avec bcrypt)
 userSchema.methods.verifierMotDePasse = function(motDePasseCandidat) {
-  // À implémenter avec bcrypt
-  return motDePasseCandidat === this.motDePasse;
+  return bcrypt.compare(motDePasseCandidat, this.motDePasse);
 };
 
 // Créer le modèle Mongoose
