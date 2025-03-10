@@ -98,11 +98,15 @@ class UserService extends BaseService {
     
     // Générer le token JWT avec la clé définie dans config
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role }, // Payload
-      config.jwt.secret, // Utilisation de la clé secrète définie dans config
-      { expiresIn: '60d' } // Expiration du token (2 mois)
+      { 
+        id: user._id,
+        role: user.role,
+        email: user.email
+      },
+      config.jwt.secret,
+      { expiresIn: '60d' }
     );
-    user.token = token;
+    
     return token;
   }
 
