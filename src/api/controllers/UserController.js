@@ -1,5 +1,6 @@
 const BaseController = require('./BaseController');
 const UserService = require('../services/UserService');
+
 /**
  * Contrôleur pour gérer les utilisateurs
  * Suit le principe d'interface ségrégation (I de SOLID)
@@ -129,6 +130,65 @@ class UserController extends BaseController {
       });
     }
   };
+
+  registerUser = async (req, res) => {
+    try {
+      const { nom, prenom, email, motDePasse, role, telephone, adresse } = req.body;
+  
+      // Valider les champs
+      this.service.validateFields({ nom, prenom, email, motDePasse });
+
+    // Vérifier si l'utilisateur existe déjà
+    await this.service.checkIfUserExists(email);
+
+    // Hashage du mot de passe
+    const hashedPassword = await this.service.hashPassword(motDePasse);
+  
+      // Création de l'utilisateur
+      const newUser = {
+        nom,
+        prenom,
+        email,
+        motDePasse: hashedPassword,
+        role,
+        telephone,
+        adresse,
+        estActif: true // L'utilisateur peut être actif immédiatement
+      };
+  
+  
+      // Générer un token JWT
+      const token = this.service.generateToken(newUser);
+
+      // Sauvegarder l'utilisateur dans la base de données
+      await this.service.create(newUser); 
+
+      // Répondre avec l'utilisateur créé et le token JWT
+      res.status(201).json({
+        success: true,
+        message: 'Utilisateur créé avec succès',
+        data: {
+          user: {
+            id: newUser._id,
+            nom: newUser.nom,
+            prenom: newUser.prenom,
+            email: newUser.email,
+            role: newUser.role,
+            telephone: newUser.telephone,
+            adresse: newUser.adresse
+          },
+          token
+        }
+      });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({
+        success: false,
+        message: 'Erreur serveur lors de l\'inscription de l\'utilisateur'
+      });
+    }
+  };
+  
 }
 
 module.exports = new UserController(); 
