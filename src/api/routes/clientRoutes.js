@@ -1,7 +1,7 @@
 const express = require('express');
 const { protect, authorize } = require('../middlewares/auth');
 const jwt = require('jsonwebtoken');
-const vehiculeController = require('../controllers/vehiculeController');
+const vehiculeController = require('../controllers/VehiculeController');
 const router = express.Router();
 
 // Toutes ces routes nécessitent d'être authentifié en tant que client
