@@ -26,8 +26,20 @@ getVehicules = async (req, res) => {
       });
     }
   };
-  
+ // Créer un véhicule pour l'utilisateur connecté
+ async createVehicule(req, res) {
+    try {
+      const userId = req.user.id; // Vérifie que req.user existe bien
 
+      const vehiculeData = req.body;
+      vehiculeData.user = userId; // Ajoute explicitement l'ID utilisateur
+  
+      const newVehicule = await Vehiculeservice.createVehicule(userId,vehiculeData);
+      res.status(201).json({ success: true, data: newVehicule });
+    } catch (error) {
+      res.status(500).json({ success: false, message: "Erreur lors de la création du véhicule: " + error.message });
+    }
+  };  
 }
 
 module.exports = new VehiculeController(); 

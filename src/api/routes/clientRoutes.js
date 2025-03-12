@@ -8,23 +8,10 @@ const router = express.Router();
 router.use(protect);
 router.use(authorize('client'));
 
-function verifyToken(req, res, next) {
-  const token = req.headers['authorization']?.split(' ')[1]; // Extraire le token de l'en-tête Authorization
-
-  if (!token) {
-    return res.status(403).json({ message: 'Token requis' });
-  }
-
-  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
-    if (err) {
-      return res.status(401).json({ message: 'Token invalide' });
-    }
-    req.user = decoded; // L'utilisateur est ajouté à la requête
-    next();
-  });
-}
 // Route pour récupérer les véhicules de l'utilisateur connecté
-router.get('/vehicules', verifyToken, vehiculeController.getVehicules);
+router.get('/vehicules', vehiculeController.getVehicules);
 
+// Route pour créer un véhicule pour l'utilisateur connecté
+router.post('/vehicules', vehiculeController.createVehicule);
 
 module.exports = router; 
