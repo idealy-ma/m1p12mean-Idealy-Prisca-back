@@ -112,6 +112,36 @@ class DevisService extends BaseService {
       throw error;
     }
   }
+
+  /**
+   * Récupère un devis par son ID avec les relations peuplées
+   * @param {string} id - L'ID du devis
+   * @returns {Promise<Object>} Le devis trouvé
+   * @throws {Error} Si l'ID est invalide ou si le devis n'est pas trouvé
+   */
+  async getDevisById(id) {
+    try {
+      // Vérifier si l'ID est valide
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        throw new Error('ID de devis invalide');
+      }
+
+      // Récupérer le devis avec les relations peuplées
+      const devis = await this.repository.model.findById(id)
+        .populate('client', 'nom prenom email')
+        .populate('vehicule', 'immatricule marque modele')
+        .populate('reponduPar', 'nom prenom');
+
+      // Vérifier si le devis existe
+      if (!devis) {
+        throw new Error('Devis non trouvé');
+      }
+
+      return devis;
+    } catch (error) {
+      throw error;
+    }
+  }
 }
 
 module.exports = new DevisService(); 
