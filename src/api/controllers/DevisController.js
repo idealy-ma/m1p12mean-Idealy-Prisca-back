@@ -88,6 +88,49 @@ class DevisController extends BaseController {
       next(error);
     }
   }
+
+  /**
+   * Récupère les détails d'un devis par son ID
+   * @param {Object} req - Requête Express
+   * @param {Object} res - Réponse Express
+   * @param {Object} next - Fonction next d'Express
+   */
+  getDevisById = async (req, res, next) => {
+    try {
+      const { id } = req.params;
+
+      // Vérifier si l'ID est fourni
+      if (!id) {
+        return res.status(400).json({
+          success: false,
+          message: 'ID du devis non fourni'
+        });
+      }
+
+      const devis = await this.service.getDevisById(id);
+
+      res.status(200).json({
+        success: true,
+        message: 'Devis récupéré avec succès',
+        data: devis
+      });
+    } catch (error) {
+      // Gérer les différents types d'erreurs
+      if (error.message === 'ID de devis invalide') {
+        return res.status(400).json({
+          success: false,
+          message: error.message
+        });
+      }
+      if (error.message === 'Devis non trouvé') {
+        return res.status(404).json({
+          success: false,
+          message: error.message
+        });
+      }
+      next(error);
+    }
+  }
 }
 
 module.exports = new DevisController(); 
