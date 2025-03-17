@@ -19,6 +19,7 @@ router.patch('/users/:id/status', UserController.changeActiveStatus);
 
 // Routes de gestion des devis
 router.get('/devis', DevisController.getAllDevis);
+router.get('/devis/:id', DevisController.getDevisById);
 
 // Autres routes spécifiques au manager
 // Par exemple, statistiques, rapports, etc.
