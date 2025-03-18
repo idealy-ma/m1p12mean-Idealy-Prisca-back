@@ -18,10 +18,10 @@ class ServiceService extends BaseService {
   }
   
   // Fonction pour créer un service
-  async createNewService(name, type,descri) {
+  async createNewService(name, type,prix,descri) {
     try {
       // Crée un nouveau service
-      const newService = { name, type,descri };
+      const newService = { name, type,prix,descri };
       await this.repository.model.create(newService);
       return newService;
     } catch (error) {

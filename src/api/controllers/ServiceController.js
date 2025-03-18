@@ -12,7 +12,7 @@ class ServiceController extends BaseController {
   }
   createService = async (req, res) => {
     try {
-      const { name, type,descri } = req.body;
+      const { name, type,prix,descri } = req.body;
   
       // Vérification des erreurs de validation
       const errors = validationResult(req);
@@ -24,7 +24,7 @@ class ServiceController extends BaseController {
       await this.service.checkIfServiceExists(name);
 
       // Créer le service (logique déléguée au service)
-      const newService = await this.service.createNewService(name, type,descri);
+      const newService = await this.service.createNewService(name, type,prix,descri);
   
       return res.status(200).json({ message: 'Service créé avec succès', data: newService });
     } catch (error) {

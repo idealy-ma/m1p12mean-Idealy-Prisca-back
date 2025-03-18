@@ -11,6 +11,10 @@ const ServiceSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  prix:{
+    type: Number,
+    default: 0
+  },
   descri:
   {
     type: String
