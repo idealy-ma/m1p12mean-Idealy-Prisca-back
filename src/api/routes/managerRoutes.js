@@ -24,6 +24,8 @@ router.patch('/users/:id/suspend', UserController.suspendUser);
 router.post('/employees', UserController.registerEmployee);
 // Route pour supprimer un employé (mécanicien ou manager)
 router.delete('/employees/:id', UserController.deleteEmployee);
+// Route pour modifier le rôle d'un employé
+router.patch('/employees/:id/role', UserController.changeEmployeeRole);
 
 // Routes de gestion des devis
 router.get('/devis', DevisController.getAllDevis);

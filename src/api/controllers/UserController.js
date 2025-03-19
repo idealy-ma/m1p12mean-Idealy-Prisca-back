@@ -403,6 +403,79 @@ class UserController extends BaseController {
       });
     }
   };
+
+  /**
+   * Change le rôle d'un employé (mécanicien ou manager)
+   * Accessible uniquement par les managers
+   * @param {Object} req - La requête Express
+   * @param {Object} res - La réponse Express
+   * @returns {Promise<void>}
+   */
+  changeEmployeeRole = async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { role } = req.body;
+      
+      // Vérifier que le rôle est valide
+      if (role !== 'mecanicien' && role !== 'manager') {
+        return res.status(400).json({
+          success: false,
+          message: 'Le rôle doit être soit mécanicien soit manager'
+        });
+      }
+      
+      // Vérifier si l'employé existe
+      const employee = await this.service.getById(id);
+      
+      if (!employee) {
+        return res.status(404).json({
+          success: false,
+          message: 'Employé non trouvé'
+        });
+      }
+      
+      // Vérifier que l'utilisateur est bien un employé (mécanicien ou manager)
+      if (employee.role !== 'mecanicien' && employee.role !== 'manager') {
+        return res.status(400).json({
+          success: false,
+          message: 'L\'utilisateur n\'est pas un employé (mécanicien ou manager)'
+        });
+      }
+      
+      // Un manager ne peut pas changer son propre rôle
+      if (employee._id.toString() === req.user._id.toString()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Vous ne pouvez pas modifier votre propre rôle'
+        });
+      }
+      
+      // Si on change le rôle d'un manager à mécanicien, vérifier s'il reste assez de managers
+      if (employee.role === 'manager' && role === 'mecanicien') {
+        const activeManagers = await this.service.getActiveManagersCount();
+        if (activeManagers <= 1 && employee.estActif) {
+          return res.status(400).json({
+            success: false,
+            message: 'Impossible de changer le rôle du dernier manager actif'
+          });
+        }
+      }
+      
+      // Changer le rôle de l'employé
+      const updatedEmployee = await this.service.update(id, { role });
+      
+      res.status(200).json({
+        success: true,
+        message: `Le rôle de l'employé ${employee.prenom} ${employee.nom} a été changé en ${role === 'mecanicien' ? 'mécanicien' : 'manager'} avec succès`,
+        data: updatedEmployee
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: error.message || 'Erreur lors du changement de rôle de l\'employé'
+      });
+    }
+  };
 }
 
 module.exports = new UserController(); 
