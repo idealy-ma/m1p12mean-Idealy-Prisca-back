@@ -405,6 +405,51 @@ class UserController extends BaseController {
   };
 
   /**
+   * Réactive un utilisateur suspendu (définit estActif à true)
+   * Accessible uniquement par les managers
+   * @param {Object} req - La requête Express
+   * @param {Object} res - La réponse Express
+   * @returns {Promise<void>}
+   */
+  reactivateUser = async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Vérifier si l'utilisateur existe
+      const user = await this.service.getById(id);
+      
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'Utilisateur non trouvé'
+        });
+      }
+      
+      // Vérifier si l'utilisateur est déjà actif
+      if (user.estActif) {
+        return res.status(400).json({
+          success: false,
+          message: 'L\'utilisateur est déjà actif'
+        });
+      }
+      
+      // Réactiver l'utilisateur (définir estActif à true)
+      const reactivatedUser = await this.service.changeActiveStatus(id, true);
+      
+      res.status(200).json({
+        success: true,
+        message: `L'utilisateur ${user.prenom} ${user.nom} a été réactivé avec succès`,
+        data: reactivatedUser
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: error.message || 'Erreur lors de la réactivation de l\'utilisateur'
+      });
+    }
+  };
+
+  /**
    * Change le rôle d'un employé (mécanicien ou manager)
    * Accessible uniquement par les managers
    * @param {Object} req - La requête Express
