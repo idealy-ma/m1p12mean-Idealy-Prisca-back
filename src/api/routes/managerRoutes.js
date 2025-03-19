@@ -20,6 +20,8 @@ router.delete('/users/:id', UserController.delete);
 router.patch('/users/:id/status', UserController.changeActiveStatus);
 // Route pour ajouter un employé (mécanicien ou manager)
 router.post('/employees', UserController.registerEmployee);
+// Route pour supprimer un employé (mécanicien ou manager)
+router.delete('/employees/:id', UserController.deleteEmployee);
 
 // Routes de gestion des devis
 router.get('/devis', DevisController.getAllDevis);

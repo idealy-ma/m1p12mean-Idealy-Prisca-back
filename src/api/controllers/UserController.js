@@ -248,6 +248,59 @@ class UserController extends BaseController {
       });
     }
   };
+
+  /**
+   * Supprime un employé (mécanicien ou manager)
+   * Accessible uniquement par les managers
+   * @param {Object} req - La requête Express
+   * @param {Object} res - La réponse Express
+   * @returns {Promise<void>}
+   */
+  deleteEmployee = async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Vérifier si l'employé existe et s'il est bien un mécanicien ou un manager
+      const employee = await this.service.getById(id);
+      
+      if (!employee) {
+        return res.status(404).json({
+          success: false,
+          message: 'Employé non trouvé'
+        });
+      }
+      
+      // Vérifier que l'utilisateur est bien un employé (mécanicien ou manager)
+      if (employee.role !== 'mecanicien' && employee.role !== 'manager') {
+        return res.status(400).json({
+          success: false,
+          message: 'L\'utilisateur n\'est pas un employé (mécanicien ou manager)'
+        });
+      }
+      
+      // Un manager ne peut pas se supprimer lui-même
+      if (employee._id.toString() === req.user._id.toString()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Vous ne pouvez pas vous supprimer vous-même'
+        });
+      }
+      
+      // Supprimer l'employé
+      await this.service.delete(id);
+      
+      res.status(200).json({
+        success: true,
+        message: `${employee.role === 'mecanicien' ? 'Mécanicien' : 'Manager'} supprimé avec succès`,
+        data: null
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: error.message || 'Erreur lors de la suppression de l\'employé'
+      });
+    }
+  };
 }
 
 module.exports = new UserController(); 
