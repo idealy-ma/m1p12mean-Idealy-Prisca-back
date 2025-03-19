@@ -18,6 +18,8 @@ router.get('/users/:id', UserController.getById);
 router.put('/users/:id', UserController.update);
 router.delete('/users/:id', UserController.delete);
 router.patch('/users/:id/status', UserController.changeActiveStatus);
+// Route pour ajouter un employé (mécanicien ou manager)
+router.post('/employees', UserController.registerEmployee);
 
 // Routes de gestion des devis
 router.get('/devis', DevisController.getAllDevis);

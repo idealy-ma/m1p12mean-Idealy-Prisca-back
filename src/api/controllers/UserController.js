@@ -138,11 +138,11 @@ class UserController extends BaseController {
       // Valider les champs
       this.service.validateFields({ nom, prenom, email, motDePasse });
 
-    // Vérifier si l'utilisateur existe déjà
-    await this.service.checkIfUserExists(email);
+      // Vérifier si l'utilisateur existe déjà
+      await this.service.checkIfUserExists(email);
 
-    // Hashage du mot de passe
-    const hashedPassword = await this.service.hashPassword(motDePasse);
+      // Hashage du mot de passe
+      const hashedPassword = await this.service.hashPassword(motDePasse);
   
       // Création de l'utilisateur
       const newUser = {
@@ -189,6 +189,65 @@ class UserController extends BaseController {
     }
   };
   
+  /**
+   * Enregistre un nouvel employé (mécanicien ou manager)
+   * Accessible uniquement par les managers
+   * @param {Object} req - La requête Express
+   * @param {Object} res - La réponse Express
+   * @returns {Promise<void>}
+   */
+  registerEmployee = async (req, res) => {
+    try {
+      const { nom, prenom, email, motDePasse, role, telephone, adresse } = req.body;
+      
+      // Valider les champs obligatoires
+      this.service.validateFields({ nom, prenom, email, motDePasse });
+      
+      // Vérifier que le rôle est valide (mécanicien ou manager uniquement)
+      if (role !== 'mecanicien' && role !== 'manager') {
+        return res.status(400).json({
+          success: false,
+          message: 'Le rôle doit être soit mécanicien soit manager'
+        });
+      }
+      
+      // Vérifier si un utilisateur avec cet email existe déjà
+      await this.service.checkIfUserExists(email);
+      
+      // Hashage du mot de passe
+      const hashedPassword = await this.service.hashPassword(motDePasse);
+      
+      // Création de l'employé
+      const newEmployee = {
+        nom,
+        prenom,
+        email,
+        motDePasse: hashedPassword,
+        role,
+        telephone,
+        adresse,
+        estActif: true // L'employé est actif dès sa création
+      };
+      
+      // Sauvegarder l'employé dans la base de données
+      const savedEmployee = await this.service.create(newEmployee);
+      
+      // Masquer le mot de passe dans la réponse
+      savedEmployee.motDePasse = undefined;
+      
+      // Répondre avec l'employé créé
+      res.status(201).json({
+        success: true,
+        message: `${role === 'mecanicien' ? 'Mécanicien' : 'Manager'} créé avec succès`,
+        data: savedEmployee
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: error.message || 'Erreur lors de la création de l\'employé'
+      });
+    }
+  };
 }
 
 module.exports = new UserController(); 
