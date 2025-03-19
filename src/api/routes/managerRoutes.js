@@ -26,6 +26,8 @@ router.post('/employees', UserController.registerEmployee);
 router.delete('/employees/:id', UserController.deleteEmployee);
 // Route pour modifier le rôle d'un employé
 router.patch('/employees/:id/role', UserController.changeEmployeeRole);
+// Route pour récupérer la liste des employés (mécaniciens et managers)
+router.get('/employees', UserController.getAllEmployees);
 
 // Routes de gestion des devis
 router.get('/devis', DevisController.getAllDevis);

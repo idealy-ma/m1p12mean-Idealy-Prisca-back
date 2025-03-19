@@ -106,6 +106,68 @@ class UserService extends BaseService {
     }
   }
 
+  /**
+   * Récupère tous les employés (mécaniciens et managers)
+   * @returns {Promise<Array>} Les employés trouvés
+   */
+  async getAllEmployees() {
+    try {
+      // Utiliser une requête avec opérateur $in pour récupérer les utilisateurs avec rôle mécanicien ou manager
+      return await this.repository.model.find({
+        role: { $in: ['mecanicien', 'manager'] }
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Récupère tous les employés (mécaniciens et managers) avec pagination
+   * @param {Object} filters - Les filtres à appliquer (nom, prénom, rôle, etc.)
+   * @param {Object} options - Les options de pagination (page, limit, sort, etc.)
+   * @returns {Promise<Object>} Résultat paginé contenant les employés trouvés
+   */
+  async getAllEmployeesPaginated(filters = {}, options = {}) {
+    try {
+      // Assurer que seuls les employés (mécaniciens et managers) sont retournés
+      const employeeFilters = {
+        ...filters,
+        role: filters.role || { $in: ['mecanicien', 'manager'] }
+      };
+      
+      // Calculer le skip pour la pagination manuelle
+      const skip = (options.page - 1) * options.limit;
+      
+      // Obtenir le nombre total de documents correspondant aux filtres
+      const totalDocs = await this.repository.model.countDocuments(employeeFilters);
+      
+      // Obtenir les documents paginés
+      const docs = await this.repository.model
+        .find(employeeFilters)
+        .sort(options.sort)
+        .skip(skip)
+        .limit(options.limit);
+      
+      // Calculer le nombre total de pages
+      const totalPages = Math.ceil(totalDocs / options.limit);
+      
+      // Retourner un objet formaté similaire à mongoose-paginate-v2
+      return {
+        docs,
+        totalDocs,
+        limit: options.limit,
+        page: options.page,
+        totalPages,
+        hasPrevPage: options.page > 1,
+        hasNextPage: options.page < totalPages,
+        prevPage: options.page > 1 ? options.page - 1 : null,
+        nextPage: options.page < totalPages ? options.page + 1 : null
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+
   generateToken(user) {
     if (!user) {
       throw new Error('L\'utilisateur est nécessaire pour générer un token');

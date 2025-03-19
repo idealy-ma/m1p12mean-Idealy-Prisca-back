@@ -476,6 +476,56 @@ class UserController extends BaseController {
       });
     }
   };
+
+  /**
+   * Récupère tous les employés (mécaniciens et managers)
+   * Accessible uniquement par les managers
+   * @param {Object} req - La requête Express
+   * @param {Object} res - La réponse Express
+   * @returns {Promise<void>}
+   */
+  getAllEmployees = async (req, res) => {
+    try {
+      // Récupérer les paramètres de pagination et filtrage
+      const { page = 1, limit = 10, nom, prenom, role, estActif } = req.query;
+      
+      // Construire les options de pagination
+      const options = {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        sort: { role: 1, nom: 1, prenom: 1 } // Trier d'abord par rôle, puis par nom et prénom
+      };
+      
+      // Construire les filtres
+      const filters = {};
+      if (nom) filters.nom = { $regex: nom, $options: 'i' }; // recherche insensible à la casse
+      if (prenom) filters.prenom = { $regex: prenom, $options: 'i' };
+      if (role && (role === 'manager' || role === 'mecanicien')) filters.role = role;
+      
+      // Filtrer par état d'activation si spécifié
+      if (estActif !== undefined) {
+        // Convertir la chaîne de caractères en booléen
+        filters.estActif = estActif === 'true';
+      }
+      
+      // Récupérer les employés paginés
+      const result = await this.service.getAllEmployeesPaginated(filters, options);
+      
+      res.status(200).json({
+        success: true,
+        currentPage: result.page,
+        totalPages: result.totalPages,
+        totalItems: result.totalDocs,
+        limit: result.limit,
+        data: result.docs
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: error.message || 'Erreur lors de la récupération des employés'
+      });
+    }
+  };
 }
 
 module.exports = new UserController(); 
