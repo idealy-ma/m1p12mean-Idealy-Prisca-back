@@ -1,5 +1,7 @@
 const express = require('express');
 const UserController = require('../controllers/UserController');
+const ServiceController = require('../controllers/ServiceController');
+const ServicePackController = require('../controllers/ServicePackController');
 const DevisController = require('../controllers/DevisController');
 const { protect, authorize } = require('../middlewares/auth');
 
@@ -32,5 +34,8 @@ router.get('/dashboard', (req, res) => {
     }
   });
 });
-
+// Route pour créer un service unitaire
+router.post('/service', ServiceController.createService);
+// Route pour créer un ServicePack
+router.post('/packs', ServicePackController.createServicePack);
 module.exports = router; 
