@@ -346,6 +346,63 @@ class UserController extends BaseController {
       });
     }
   };
+
+  /**
+   * Suspend un utilisateur (définit estActif à false)
+   * Accessible uniquement par les managers
+   * @param {Object} req - La requête Express
+   * @param {Object} res - La réponse Express
+   * @returns {Promise<void>}
+   */
+  suspendUser = async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Vérifier si l'utilisateur existe
+      const user = await this.service.getById(id);
+      
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'Utilisateur non trouvé'
+        });
+      }
+      
+      // Un manager ne peut pas se suspendre lui-même
+      if (user._id.toString() === req.user._id.toString()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Vous ne pouvez pas vous suspendre vous-même'
+        });
+      }
+      
+      // Si l'utilisateur à suspendre est un manager, vérifier que l'action est autorisée
+      if (user.role === 'manager') {
+        // Autoriser uniquement si ce n'est pas le dernier manager actif
+        const activeManagers = await this.service.getActiveManagersCount();
+        if (activeManagers <= 1 && user.estActif) {
+          return res.status(400).json({
+            success: false,
+            message: 'Impossible de suspendre le dernier manager actif'
+          });
+        }
+      }
+      
+      // Suspendre l'utilisateur (définir estActif à false)
+      const suspendedUser = await this.service.changeActiveStatus(id, false);
+      
+      res.status(200).json({
+        success: true,
+        message: `L'utilisateur ${user.prenom} ${user.nom} a été suspendu avec succès`,
+        data: suspendedUser
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: error.message || 'Erreur lors de la suspension de l\'utilisateur'
+      });
+    }
+  };
 }
 
 module.exports = new UserController(); 

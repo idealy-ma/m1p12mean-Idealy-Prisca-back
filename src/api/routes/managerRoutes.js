@@ -18,6 +18,8 @@ router.get('/users/:id', UserController.getById);
 router.put('/users/:id', UserController.update);
 router.delete('/users/:id', UserController.delete);
 router.patch('/users/:id/status', UserController.changeActiveStatus);
+// Route pour suspendre un utilisateur
+router.patch('/users/:id/suspend', UserController.suspendUser);
 // Route pour ajouter un employé (mécanicien ou manager)
 router.post('/employees', UserController.registerEmployee);
 // Route pour supprimer un employé (mécanicien ou manager)

@@ -91,6 +91,21 @@ class UserService extends BaseService {
     }
   }
 
+  /**
+   * Compte le nombre de managers actifs dans le système
+   * @returns {Promise<number>} Le nombre de managers actifs
+   */
+  async getActiveManagersCount() {
+    try {
+      return await this.repository.model.countDocuments({ 
+        role: 'manager',
+        estActif: true 
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
+
   generateToken(user) {
     if (!user) {
       throw new Error('L\'utilisateur est nécessaire pour générer un token');
@@ -125,9 +140,9 @@ class UserService extends BaseService {
   };
 
   hashPassword = async (motDePasse) => {
-  //chaîne aléatoire ajoutée au mot de passe avant de le hasher
-  const salt = await bcrypt.genSalt(10);
-  return await bcrypt.hash(motDePasse, salt);
+    //chaîne aléatoire ajoutée au mot de passe avant de le hasher
+    const salt = await bcrypt.genSalt(10);
+    return await bcrypt.hash(motDePasse, salt);
   };
 
 }
