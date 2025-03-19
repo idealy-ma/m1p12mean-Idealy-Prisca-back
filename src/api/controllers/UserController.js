@@ -250,6 +250,51 @@ class UserController extends BaseController {
   };
 
   /**
+   * Permet à un utilisateur de mettre à jour ses propres informations
+   * @param {Object} req - La requête Express
+   * @param {Object} res - La réponse Express
+   * @returns {Promise<void>}
+   */
+  updateProfile = async (req, res) => {
+    try {
+      // L'utilisateur est récupéré à partir du middleware d'authentification
+      const userId = req.user._id;
+      
+      // Données autorisées à être mises à jour par l'utilisateur
+      const { nom, prenom, telephone, adresse } = req.body;
+      
+      // Créer un objet avec les données à mettre à jour
+      const updateData = {};
+      if (nom) updateData.nom = nom;
+      if (prenom) updateData.prenom = prenom;
+      if (telephone) updateData.telephone = telephone;
+      if (adresse) updateData.adresse = adresse;
+      
+      // Mise à jour du mot de passe si fourni
+      if (req.body.motDePasse) {
+        updateData.motDePasse = await this.service.hashPassword(req.body.motDePasse);
+      }
+      
+      // Ne pas autoriser la modification du rôle ou du statut actif par l'utilisateur lui-même
+      // Seul un manager peut changer ces valeurs
+      
+      // Mettre à jour l'utilisateur dans la base de données
+      const updatedUser = await this.service.update(userId, updateData);
+      
+      res.status(200).json({
+        success: true,
+        message: 'Profil mis à jour avec succès',
+        data: updatedUser
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: error.message || 'Erreur lors de la mise à jour du profil'
+      });
+    }
+  };
+
+  /**
    * Supprime un employé (mécanicien ou manager)
    * Accessible uniquement par les managers
    * @param {Object} req - La requête Express
