@@ -36,6 +36,7 @@ router.get('/dashboard', (req, res) => {
 });
 // Route pour créer un service unitaire
 router.post('/service', ServiceController.createService);
+router.get('/service', ServiceController.getAllServices);
 // Route pour créer un ServicePack
 router.post('/packs', ServicePackController.createServicePack);
 module.exports = router; 
