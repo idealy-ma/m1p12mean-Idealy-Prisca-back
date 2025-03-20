@@ -32,5 +32,15 @@ class ServiceController extends BaseController {
       return res.status(500).json({ message: error.message || 'Erreur serveur lors de la création du service' });
     }
   };
+
+   getAllServices = async (req, res) => {
+    try {
+      const services = await this.service.getAllServices();
+      return res.status(200).json({ message: 'Liste des services récupérée', data: services });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ message: 'Erreur serveur lors de la récupération des services' });
+    }
+  };
 }
 module.exports = new ServiceController(); 
