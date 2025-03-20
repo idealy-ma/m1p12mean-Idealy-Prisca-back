@@ -18,6 +18,18 @@ router.get('/users/:id', UserController.getById);
 router.put('/users/:id', UserController.update);
 router.delete('/users/:id', UserController.delete);
 router.patch('/users/:id/status', UserController.changeActiveStatus);
+// Route pour suspendre un utilisateur
+router.patch('/users/:id/suspend', UserController.suspendUser);
+// Route pour réactiver un utilisateur suspendu
+router.patch('/users/:id/reactivate', UserController.reactivateUser);
+// Route pour ajouter un employé (mécanicien ou manager)
+router.post('/employees', UserController.registerEmployee);
+// Route pour supprimer un employé (mécanicien ou manager)
+router.delete('/employees/:id', UserController.deleteEmployee);
+// Route pour modifier le rôle d'un employé
+router.patch('/employees/:id/role', UserController.changeEmployeeRole);
+// Route pour récupérer la liste des employés (mécaniciens et managers)
+router.get('/employees', UserController.getAllEmployees);
 
 // Routes de gestion des devis
 router.get('/devis', DevisController.getAllDevis);
