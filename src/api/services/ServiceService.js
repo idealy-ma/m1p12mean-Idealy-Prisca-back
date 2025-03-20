@@ -28,6 +28,9 @@ class ServiceService extends BaseService {
       throw new Error('Error creating new service: ' + error.message);
     }
   }
-
+  async getAllServices() {
+    return await this.repository.model.find();
+  }
+  
 }
 module.exports = new ServiceService(); 

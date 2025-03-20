@@ -1,7 +1,6 @@
 const BaseController = require('./BaseController');
 const ServicePackService = require('../services/ServicePackService');
 
-
 class ServicePackController extends BaseController {
   constructor() {
     super(ServicePackService);
