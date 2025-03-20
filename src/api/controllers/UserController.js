@@ -548,7 +548,7 @@ class UserController extends BaseController {
       if (role && (role === 'manager' || role === 'mecanicien')) filters.role = role;
       
       // Filtrer par état d'activation si spécifié
-      if (estActif !== undefined) {
+      if (estActif) {
         // Convertir la chaîne de caractères en booléen
         filters.estActif = estActif === 'true';
       }
