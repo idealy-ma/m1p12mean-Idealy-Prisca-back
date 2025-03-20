@@ -138,11 +138,11 @@ class UserController extends BaseController {
       // Valider les champs
       this.service.validateFields({ nom, prenom, email, motDePasse });
 
-    // Vérifier si l'utilisateur existe déjà
-    await this.service.checkIfUserExists(email);
+      // Vérifier si l'utilisateur existe déjà
+      await this.service.checkIfUserExists(email);
 
-    // Hashage du mot de passe
-    const hashedPassword = await this.service.hashPassword(motDePasse);
+      // Hashage du mot de passe
+      const hashedPassword = await this.service.hashPassword(motDePasse);
   
       // Création de l'utilisateur
       const newUser = {
@@ -189,6 +189,388 @@ class UserController extends BaseController {
     }
   };
   
+  /**
+   * Enregistre un nouvel employé (mécanicien ou manager)
+   * Accessible uniquement par les managers
+   * @param {Object} req - La requête Express
+   * @param {Object} res - La réponse Express
+   * @returns {Promise<void>}
+   */
+  registerEmployee = async (req, res) => {
+    try {
+      const { nom, prenom, email, motDePasse, role, telephone, adresse } = req.body;
+      
+      // Valider les champs obligatoires
+      this.service.validateFields({ nom, prenom, email, motDePasse });
+      
+      // Vérifier que le rôle est valide (mécanicien ou manager uniquement)
+      if (role !== 'mecanicien' && role !== 'manager') {
+        return res.status(400).json({
+          success: false,
+          message: 'Le rôle doit être soit mécanicien soit manager'
+        });
+      }
+      
+      // Vérifier si un utilisateur avec cet email existe déjà
+      await this.service.checkIfUserExists(email);
+      
+      // Hashage du mot de passe
+      const hashedPassword = await this.service.hashPassword(motDePasse);
+      
+      // Création de l'employé
+      const newEmployee = {
+        nom,
+        prenom,
+        email,
+        motDePasse: hashedPassword,
+        role,
+        telephone,
+        adresse,
+        estActif: true // L'employé est actif dès sa création
+      };
+      
+      // Sauvegarder l'employé dans la base de données
+      const savedEmployee = await this.service.create(newEmployee);
+      
+      // Masquer le mot de passe dans la réponse
+      savedEmployee.motDePasse = undefined;
+      
+      // Répondre avec l'employé créé
+      res.status(201).json({
+        success: true,
+        message: `${role === 'mecanicien' ? 'Mécanicien' : 'Manager'} créé avec succès`,
+        data: savedEmployee
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: error.message || 'Erreur lors de la création de l\'employé'
+      });
+    }
+  };
+
+  /**
+   * Permet à un utilisateur de mettre à jour ses propres informations
+   * @param {Object} req - La requête Express
+   * @param {Object} res - La réponse Express
+   * @returns {Promise<void>}
+   */
+  updateProfile = async (req, res) => {
+    try {
+      // L'utilisateur est récupéré à partir du middleware d'authentification
+      const userId = req.user._id;
+      
+      // Données autorisées à être mises à jour par l'utilisateur
+      const { nom, prenom, telephone, adresse } = req.body;
+      
+      // Créer un objet avec les données à mettre à jour
+      const updateData = {};
+      if (nom) updateData.nom = nom;
+      if (prenom) updateData.prenom = prenom;
+      if (telephone) updateData.telephone = telephone;
+      if (adresse) updateData.adresse = adresse;
+      
+      // Mise à jour du mot de passe si fourni
+      if (req.body.motDePasse) {
+        updateData.motDePasse = await this.service.hashPassword(req.body.motDePasse);
+      }
+      
+      // Ne pas autoriser la modification du rôle ou du statut actif par l'utilisateur lui-même
+      // Seul un manager peut changer ces valeurs
+      
+      // Mettre à jour l'utilisateur dans la base de données
+      const updatedUser = await this.service.update(userId, updateData);
+      
+      res.status(200).json({
+        success: true,
+        message: 'Profil mis à jour avec succès',
+        data: updatedUser
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: error.message || 'Erreur lors de la mise à jour du profil'
+      });
+    }
+  };
+
+  /**
+   * Supprime un employé (mécanicien ou manager)
+   * Accessible uniquement par les managers
+   * @param {Object} req - La requête Express
+   * @param {Object} res - La réponse Express
+   * @returns {Promise<void>}
+   */
+  deleteEmployee = async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Vérifier si l'employé existe et s'il est bien un mécanicien ou un manager
+      const employee = await this.service.getById(id);
+      
+      if (!employee) {
+        return res.status(404).json({
+          success: false,
+          message: 'Employé non trouvé'
+        });
+      }
+      
+      // Vérifier que l'utilisateur est bien un employé (mécanicien ou manager)
+      if (employee.role !== 'mecanicien' && employee.role !== 'manager') {
+        return res.status(400).json({
+          success: false,
+          message: 'L\'utilisateur n\'est pas un employé (mécanicien ou manager)'
+        });
+      }
+      
+      // Un manager ne peut pas se supprimer lui-même
+      if (employee._id.toString() === req.user._id.toString()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Vous ne pouvez pas vous supprimer vous-même'
+        });
+      }
+      
+      // Supprimer l'employé
+      await this.service.delete(id);
+      
+      res.status(200).json({
+        success: true,
+        message: `${employee.role === 'mecanicien' ? 'Mécanicien' : 'Manager'} supprimé avec succès`,
+        data: null
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: error.message || 'Erreur lors de la suppression de l\'employé'
+      });
+    }
+  };
+
+  /**
+   * Suspend un utilisateur (définit estActif à false)
+   * Accessible uniquement par les managers
+   * @param {Object} req - La requête Express
+   * @param {Object} res - La réponse Express
+   * @returns {Promise<void>}
+   */
+  suspendUser = async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Vérifier si l'utilisateur existe
+      const user = await this.service.getById(id);
+      
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'Utilisateur non trouvé'
+        });
+      }
+      
+      // Un manager ne peut pas se suspendre lui-même
+      if (user._id.toString() === req.user._id.toString()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Vous ne pouvez pas vous suspendre vous-même'
+        });
+      }
+      
+      // Si l'utilisateur à suspendre est un manager, vérifier que l'action est autorisée
+      if (user.role === 'manager') {
+        // Autoriser uniquement si ce n'est pas le dernier manager actif
+        const activeManagers = await this.service.getActiveManagersCount();
+        if (activeManagers <= 1 && user.estActif) {
+          return res.status(400).json({
+            success: false,
+            message: 'Impossible de suspendre le dernier manager actif'
+          });
+        }
+      }
+      
+      // Suspendre l'utilisateur (définir estActif à false)
+      const suspendedUser = await this.service.changeActiveStatus(id, false);
+      
+      res.status(200).json({
+        success: true,
+        message: `L'utilisateur ${user.prenom} ${user.nom} a été suspendu avec succès`,
+        data: suspendedUser
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: error.message || 'Erreur lors de la suspension de l\'utilisateur'
+      });
+    }
+  };
+
+  /**
+   * Réactive un utilisateur suspendu (définit estActif à true)
+   * Accessible uniquement par les managers
+   * @param {Object} req - La requête Express
+   * @param {Object} res - La réponse Express
+   * @returns {Promise<void>}
+   */
+  reactivateUser = async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Vérifier si l'utilisateur existe
+      const user = await this.service.getById(id);
+      
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'Utilisateur non trouvé'
+        });
+      }
+      
+      // Vérifier si l'utilisateur est déjà actif
+      if (user.estActif) {
+        return res.status(400).json({
+          success: false,
+          message: 'L\'utilisateur est déjà actif'
+        });
+      }
+      
+      // Réactiver l'utilisateur (définir estActif à true)
+      const reactivatedUser = await this.service.changeActiveStatus(id, true);
+      
+      res.status(200).json({
+        success: true,
+        message: `L'utilisateur ${user.prenom} ${user.nom} a été réactivé avec succès`,
+        data: reactivatedUser
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: error.message || 'Erreur lors de la réactivation de l\'utilisateur'
+      });
+    }
+  };
+
+  /**
+   * Change le rôle d'un employé (mécanicien ou manager)
+   * Accessible uniquement par les managers
+   * @param {Object} req - La requête Express
+   * @param {Object} res - La réponse Express
+   * @returns {Promise<void>}
+   */
+  changeEmployeeRole = async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { role } = req.body;
+      
+      // Vérifier que le rôle est valide
+      if (role !== 'mecanicien' && role !== 'manager') {
+        return res.status(400).json({
+          success: false,
+          message: 'Le rôle doit être soit mécanicien soit manager'
+        });
+      }
+      
+      // Vérifier si l'employé existe
+      const employee = await this.service.getById(id);
+      
+      if (!employee) {
+        return res.status(404).json({
+          success: false,
+          message: 'Employé non trouvé'
+        });
+      }
+      
+      // Vérifier que l'utilisateur est bien un employé (mécanicien ou manager)
+      if (employee.role !== 'mecanicien' && employee.role !== 'manager') {
+        return res.status(400).json({
+          success: false,
+          message: 'L\'utilisateur n\'est pas un employé (mécanicien ou manager)'
+        });
+      }
+      
+      // Un manager ne peut pas changer son propre rôle
+      if (employee._id.toString() === req.user._id.toString()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Vous ne pouvez pas modifier votre propre rôle'
+        });
+      }
+      
+      // Si on change le rôle d'un manager à mécanicien, vérifier s'il reste assez de managers
+      if (employee.role === 'manager' && role === 'mecanicien') {
+        const activeManagers = await this.service.getActiveManagersCount();
+        if (activeManagers <= 1 && employee.estActif) {
+          return res.status(400).json({
+            success: false,
+            message: 'Impossible de changer le rôle du dernier manager actif'
+          });
+        }
+      }
+      
+      // Changer le rôle de l'employé
+      const updatedEmployee = await this.service.update(id, { role });
+      
+      res.status(200).json({
+        success: true,
+        message: `Le rôle de l'employé ${employee.prenom} ${employee.nom} a été changé en ${role === 'mecanicien' ? 'mécanicien' : 'manager'} avec succès`,
+        data: updatedEmployee
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: error.message || 'Erreur lors du changement de rôle de l\'employé'
+      });
+    }
+  };
+
+  /**
+   * Récupère tous les employés (mécaniciens et managers)
+   * Accessible uniquement par les managers
+   * @param {Object} req - La requête Express
+   * @param {Object} res - La réponse Express
+   * @returns {Promise<void>}
+   */
+  getAllEmployees = async (req, res) => {
+    try {
+      // Récupérer les paramètres de pagination et filtrage
+      const { page = 1, limit = 10, nom, prenom, role, estActif } = req.query;
+      
+      // Construire les options de pagination
+      const options = {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        sort: { role: 1, nom: 1, prenom: 1 } // Trier d'abord par rôle, puis par nom et prénom
+      };
+      
+      // Construire les filtres
+      const filters = {};
+      if (nom) filters.nom = { $regex: nom, $options: 'i' }; // recherche insensible à la casse
+      if (prenom) filters.prenom = { $regex: prenom, $options: 'i' };
+      if (role && (role === 'manager' || role === 'mecanicien')) filters.role = role;
+      
+      // Filtrer par état d'activation si spécifié
+      if (estActif) {
+        // Convertir la chaîne de caractères en booléen
+        filters.estActif = estActif === 'true';
+      }
+      
+      // Récupérer les employés paginés
+      const result = await this.service.getAllEmployeesPaginated(filters, options);
+      
+      res.status(200).json({
+        success: true,
+        currentPage: result.page,
+        totalPages: result.totalPages,
+        totalItems: result.totalDocs,
+        limit: result.limit,
+        data: result.docs
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: error.message || 'Erreur lors de la récupération des employés'
+      });
+    }
+  };
 }
 
 module.exports = new UserController(); 

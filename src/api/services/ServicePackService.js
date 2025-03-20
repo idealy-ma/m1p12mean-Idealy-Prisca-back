@@ -1,6 +1,8 @@
 const BaseService = require('./BaseService');
 const ServiceService= require('./ServiceService');
+
 const ServicePackModel = require('../models/ServicePAck');
+const ServicePackModel = require('../models/ServicePack');
 class ServicePackService extends BaseService {
     constructor() {
         super(ServicePackModel);
