@@ -75,10 +75,10 @@ class DevisController extends BaseController {
     try {
       // Si l'utilisateur est un client, on utilise son ID
       if (req.user.role === 'client') {
-        req.body.client = req.user.id;
+        req.body.client = req.user._id;
       }
       
-      const devis = await this.service.create(req.body);
+      const devis = await this.service.createDevis(req.body);
       
       res.status(201).json({
         success: true,
