@@ -12,26 +12,37 @@ const devisSchema = new mongoose.Schema({
     ref: 'Vehicule',
     required: [true, 'Le véhicule est requis']
   },
-  description: {
+  probleme: {
     type: String,
-    required: [true, 'La description des services demandés est requise'],
     trim: true
+  },
+  servicesChoisis: [{
+    service: { type: mongoose.Schema.Types.ObjectId, ref: 'Service' },
+    prix: Number
+  }],
+  packsChoisis: [{
+    servicePack: { type: mongoose.Schema.Types.ObjectId, ref: 'ServicePack' },
+    prix: Number
+  }],
+  lignesSupplementaires: [{
+    description: { type: String },  // Optionnel : Le responsable peut rédiger une description
+    prix: { type: Number, required: true }  // Obligatoire : Le prix doit être défini pour chaque ligne
+  }],
+  total: {
+    type: Number,
+    default: 0
   },
   dateCreation: {
     type: Date,
     default: Date.now
   },
+  dateReponse: {
+    type: Date
+  },
   status: {
     type: String,
     enum: ['en_attente', 'accepte', 'refuse', 'en_cours', 'termine'],
     default: 'en_attente'
-  },
-  montantEstime: {
-    type: Number,
-    default: 0
-  },
-  dateReponse: {
-    type: Date
   },
   reponduPar: {
     type: mongoose.Schema.Types.ObjectId,
@@ -55,6 +66,41 @@ const DevisModel = mongoose.model('Devis', devisSchema);
 class Devis extends BaseModel {
   constructor() {
     super(DevisModel);
+  }
+   // Calculer le total final
+   async updateTotal(devisId) {
+    const devis = await DevisModel.findById(devisId)
+      .populate('servicesChoisis.service')
+      .populate('packsChoisis.servicePack');
+    
+    let total = 0;
+    
+    // Calculer le prix des services choisis
+    devis.servicesChoisis.forEach(service => {
+      total += service.prix;
+    });
+    
+    // Calculer le prix des packs choisis
+    devis.packsChoisis.forEach(pack => {
+      total += pack.prix;
+    });
+    
+    // Ajouter les lignes supplémentaires
+    devis.lignesSupplementaires.forEach(ligne => {
+      total += ligne.prix;
+    });
+    
+    // Mettre à jour le total
+    devis.total = total;
+    await devis.save();
+  }
+
+  // Marquer le devis comme "terminé"
+  async finalizeDevis(devisId) {
+    const devis = await DevisModel.findById(devisId);
+    devis.status = 'termine';
+    devis.dateReponse = new Date();
+    await devis.save();
   }
 }
 
