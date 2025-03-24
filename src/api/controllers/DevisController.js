@@ -131,6 +131,41 @@ class DevisController extends BaseController {
       next(error);
     }
   }
+  // Ajouter une ligne supplémentaire
+addLigneSupplementaire = async (req, res, next) => {
+  try {
+    const { devisId } = req.params;
+    const ligne = req.body;
+    const updatedDevis = await this.service.addLigneSupplementaire(devisId, ligne);
+    res.status(200).json(updatedDevis);
+  } catch (error) {
+    next(error); // Utilisation de `next()` pour la gestion d'erreurs centralisée
+  }
+};
+
+// Finaliser un devis
+finalizeDevis = async (req, res, next) => {
+  try {
+    const { devisId } = req.params;
+    const result = await this.service.finalizeDevis(devisId);
+    res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Obtenir tous les devis d'un client
+getDevisByClient = async (req, res, next) => {
+  try {
+    const { clientId } = req.params;
+    const devis = await this.service.getDevisByClient(clientId);
+    res.status(200).json(devis);
+  } catch (error) {
+    next(error);
+  }
+};
+
+
 }
 
 module.exports = new DevisController(); 
