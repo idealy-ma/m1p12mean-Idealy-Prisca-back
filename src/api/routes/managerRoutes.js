@@ -34,9 +34,9 @@ router.get('/employees', UserController.getAllEmployees);
 // Routes de gestion des devis
 router.get('/devis', DevisController.getAllDevis);
 router.get('/devis/:id', DevisController.getDevisById);
-
-// Autres routes spécifiques au manager
-// Par exemple, statistiques, rapports, etc.
+router.post('/devis/:devisId/finaliser', DevisController.finalizeDevis);
+// Ajouter une ligne supplémentaire à un devis
+router.post('/devis/:devisId/ligne-supplementaire', DevisController.addLigneSupplementaire);
 router.get('/dashboard', (req, res) => {
   res.status(200).json({
     success: true,
