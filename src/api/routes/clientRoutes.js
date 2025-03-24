@@ -3,6 +3,7 @@ const { protect, authorize } = require('../middlewares/auth');
 const jwt = require('jsonwebtoken');
 const vehiculeController = require('../controllers/VehiculeController');
 const router = express.Router();
+const DevisController = require('../controllers/DevisController');
 
 // Toutes ces routes nécessitent d'être authentifié en tant que client
 router.use(protect);
@@ -14,4 +15,6 @@ router.get('/vehicules', vehiculeController.getVehicules);
 // Route pour créer un véhicule pour l'utilisateur connecté
 router.post('/vehicules', vehiculeController.createVehicule);
 
+// Créer un devis
+router.post('/devis', DevisController.createDevis);
 module.exports = router; 
