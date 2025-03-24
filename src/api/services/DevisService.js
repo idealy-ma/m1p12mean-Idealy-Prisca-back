@@ -130,7 +130,8 @@ class DevisService extends BaseService {
       const devis = await this.repository.model.findById(id)
         .populate('client', 'nom prenom email')
         .populate('vehicule', 'immatricule marque modele')
-        .populate('reponduPar', 'nom prenom');
+        .populate('reponduPar', 'nom prenom')
+        .populate('servicesChoisis.service').populate('packsChoisis.servicePack');
 
       // Vérifier si le devis existe
       if (!devis) {
@@ -147,6 +148,25 @@ class DevisService extends BaseService {
     const devis = await this.repository.model.create(data);
     await DevisModel.updateTotal(devis._id); // Calculer le total après création
     return devis;
+  }
+  // Ajouter une ligne supplémentaire au devis
+  async addLigneSupplementaire(devisId, ligne) {
+    const devis = await this.repository.model.findById(devisId);
+    devis.lignesSupplementaires.push(ligne);
+    await devis.save();
+    await DevisModel.updateTotal(devisId); // Recalculer le total
+    return devis;
+  }
+
+  // Finaliser le devis (le marquer comme "terminé")
+  async finalizeDevis(devisId) {
+    await DevisModel.finalizeDevis(devisId);
+    return { message: 'Devis envoyé avec succès' };
+  }
+
+  // Récupérer tous les devis d'un client
+  async getDevisByClient(clientId) {
+    return await this.repository.model.find({ client: clientId }).populate('servicesChoisis.service').populate('packsChoisis.servicePack');
   }
 
 }
