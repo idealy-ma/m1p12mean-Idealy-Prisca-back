@@ -41,7 +41,7 @@ const devisSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['en_attente', 'accepte', 'refuse', 'en_cours', 'termine'],
+    enum: ['en_attente', 'accepte', 'refuse', 'termine'],
     default: 'en_attente'
   },
   reponduPar: {
