@@ -142,6 +142,13 @@ class DevisService extends BaseService {
       throw error;
     }
   }
+   // Créer un devis avec les services choisis et packs
+  async createDevis(data) {
+    const devis = await this.repository.model.create(data);
+    await DevisModel.updateTotal(devis._id); // Calculer le total après création
+    return devis;
+  }
+
 }
 
 module.exports = new DevisService(); 
