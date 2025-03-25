@@ -198,7 +198,7 @@ class UserController extends BaseController {
    */
   registerEmployee = async (req, res) => {
     try {
-      const { nom, prenom, email, motDePasse, role, telephone, adresse } = req.body;
+      const { nom, prenom, email, motDePasse, role, telephone, adresse,tarifHoraire } = req.body;
       
       // Valider les champs obligatoires
       this.service.validateFields({ nom, prenom, email, motDePasse });
@@ -226,7 +226,8 @@ class UserController extends BaseController {
         role,
         telephone,
         adresse,
-        estActif: true // L'employé est actif dès sa création
+        estActif: true ,// L'employé est actif dès sa création
+        tarifHoraire
       };
       
       // Sauvegarder l'employé dans la base de données
