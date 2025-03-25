@@ -32,6 +32,8 @@ class ServicePackService extends BaseService {
     await this.repository.model.create(newPack);
     return newPack;
   }
-
+  async getAllServicesPack() {
+    return await this.repository.model.find();
+  }
 }
 module.exports = new ServicePackService(); 
