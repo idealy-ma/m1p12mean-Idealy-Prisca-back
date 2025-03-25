@@ -24,5 +24,14 @@ class ServicePackController extends BaseController {
       return res.status(400).json({ message: error.message });
     }
   };
+  getAllServicesPack = async (req, res) => {
+    try {
+      const servicespack = await this.service.getAllServicesPack();
+      return res.status(200).json({ message: 'Liste des servicespack récupérée', data: servicespack });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ message: 'Erreur serveur lors de la récupération des services' });
+    }
+  };
 }
 module.exports = new ServicePackController(); 
