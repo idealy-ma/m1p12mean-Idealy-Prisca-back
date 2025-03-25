@@ -37,6 +37,9 @@ router.get('/devis/:id', DevisController.getDevisById);
 router.post('/devis/:devisId/finaliser', DevisController.finalizeDevis);
 // Ajouter une ligne supplémentaire à un devis
 router.post('/devis/:devisId/ligne-supplementaire', DevisController.addLigneSupplementaire);
+// Route pour assigner des mécaniciens à un devis
+router.post('/devis/assigner-mecaniciens', DevisController.assignMecaniciens);
+
 router.get('/dashboard', (req, res) => {
   res.status(200).json({
     success: true,
