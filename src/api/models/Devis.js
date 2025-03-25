@@ -26,7 +26,11 @@ const devisSchema = new mongoose.Schema({
   }],
   lignesSupplementaires: [{
     description: { type: String },  // Optionnel : Le responsable peut rédiger une description
-    prix: { type: Number, required: true }  // Obligatoire : Le prix doit être défini pour chaque ligne
+    prix: { type: Number, required: true },  // Obligatoire : Le prix doit être défini pour chaque ligne
+    quantite: Number,
+    type:String,
+    note:String,
+    priorite:String
   }],
   total: {
     type: Number,
@@ -87,7 +91,7 @@ class Devis extends BaseModel {
     
     // Ajouter les lignes supplémentaires
     devis.lignesSupplementaires.forEach(ligne => {
-      total += ligne.prix;
+      total += ligne.prix*ligne.quantite;
     });
     
     // Mettre à jour le total
