@@ -82,6 +82,8 @@ class DevisService extends BaseService {
         .populate('client', 'nom prenom email')
         .populate('vehicule', 'immatricule marque modele')
         .populate('reponduPar', 'nom prenom')
+        .populate('servicesChoisis.service').populate('packsChoisis.servicePack')
+        .populate('mecaniciensTravaillant.mecanicien', 'nom prenom tarifHoraire')
         .sort(sort)
         .skip(skip)
         .limit(limit);
@@ -131,7 +133,8 @@ class DevisService extends BaseService {
         .populate('client', 'nom prenom email')
         .populate('vehicule', 'immatricule marque modele')
         .populate('reponduPar', 'nom prenom')
-        .populate('servicesChoisis.service').populate('packsChoisis.servicePack');
+        .populate('servicesChoisis.service').populate('packsChoisis.servicePack')
+        .populate('mecaniciensTravaillant.mecanicien', 'nom prenom tarifHoraire');
 
       // Vérifier si le devis existe
       if (!devis) {
@@ -167,8 +170,55 @@ class DevisService extends BaseService {
   // Récupérer tous les devis d'un client
   async getDevisByClient(clientId) {
     return await this.repository.model.find({ client: clientId }).populate('vehicule', 'immatricule marque modele')
-    .populate('reponduPar', 'nom prenom').populate('servicesChoisis.service').populate('packsChoisis.servicePack');
+    .populate('reponduPar', 'nom prenom').populate('servicesChoisis.service').populate('packsChoisis.servicePack')
+    .populate('mecaniciensTravaillant.mecanicien', 'nom prenom tarifHoraire');
   }
+  /**
+ * Assigner un ou plusieurs mécaniciens à un devis.
+ * 
+ * @param {mongoose.Types.ObjectId} devisId - L'identifiant du devis.
+ * @param {Array} mecaniciensIds - Un tableau d'ID de mécaniciens à assigner.
+ * @param {Array} heuresDeTravail - Un tableau d'heures de travail correspondantes pour chaque mécanicien.
+ * @returns {Promise} - Une promesse qui résout le devis mis à jour.
+ */
+async assignMecaniciens(devisId, mecaniciensIds, heuresDeTravail) {
+  if (mecaniciensIds.length !== heuresDeTravail.length) {
+    throw new Error("Le nombre de mécaniciens ne correspond pas au nombre d'heures de travail.");
+  }
+
+  // Trouver le devis à mettre à jour
+  const devis = await DevisModel.findById(devisId);
+  if (!devis) {
+    throw new Error("Devis non trouvé");
+  }
+
+  // Vérifier si le mécanicien est déjà assigné
+  mecaniciensIds.forEach(mecanicienId => {
+    const isAlreadyAssigned = devis.mecaniciensTravaillant.some(
+      (mecanicien) => mecanicien.mecanicien.toString() === mecanicienId.toString()
+    );
+
+    if (isAlreadyAssigned) {
+      throw new Error(`Le mécanicien avec l'ID ${mecanicienId} est déjà assigné à ce devis.`);
+    }
+  });
+
+  // Préparer les mécaniciens à ajouter
+  const mecaniciensTravaillant = mecaniciensIds.map((mecanicienId, index) => ({
+    mecanicien: mecanicienId,
+    heureDeTravail: heuresDeTravail[index],
+    debut: null // Vous pouvez ajouter une date de début si nécessaire
+  }));
+
+  // Ajouter les mécaniciens au devis
+  devis.mecaniciensTravaillant.push(...mecaniciensTravaillant);
+
+  // Sauvegarder le devis mis à jour
+  await devis.save();
+  await DevisModel.updateTotal(devisId); // Recalculer le total
+
+  return devis; // Retourne le devis mis à jour
+}
 
 }
 
