@@ -17,12 +17,14 @@ const devisSchema = new mongoose.Schema({
   },
   servicesChoisis: [{
     service: { type: mongoose.Schema.Types.ObjectId, ref: 'Service' },
+    prix:Number,
     note: { type: String },
     priorite: { type: String },
     completed: Boolean
   }],
   packsChoisis: [{
     servicePack: { type: mongoose.Schema.Types.ObjectId, ref: 'ServicePack' },
+    prix:Number,
     note: { type: String },
     priorite: { type: String },
     completed: Boolean
@@ -37,7 +39,7 @@ const devisSchema = new mongoose.Schema({
     completed: Boolean
   }],
   mecaniciensTravaillant:[{
-    mecanicien: { type: mongoose.Schema.Types.ObjectId, ref: 'Users' }, 
+    mecanicien: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     note: { type: String },
     heureDeTravail: { type: Number },
     debut: { 
@@ -97,35 +99,50 @@ class Devis extends BaseModel {
       .populate('servicesChoisis.service')
       .populate('packsChoisis.servicePack')
       .populate('mecaniciensTravaillant.mecanicien'); // Assurez-vous de peupler les mécaniciens pour obtenir leurs informations
-    
+  
     let total = 0;
   
-    // Calculer le prix des services choisis
-    devis.servicesChoisis.forEach(service => {
-      total += service.prix;
-    });
+    // Vérifier et calculer le prix des services choisis
+    if (devis.servicesChoisis && devis.servicesChoisis.length > 0) {
+      devis.servicesChoisis.forEach(service => {
+        if (service.prix) {
+          total += service.prix;
+        }
+      });
+    }
   
-    // Calculer le prix des packs choisis
-    devis.packsChoisis.forEach(pack => {
-      total += pack.prix;
-    });
+    // Vérifier et calculer le prix des packs choisis
+    if (devis.packsChoisis && devis.packsChoisis.length > 0) {
+      devis.packsChoisis.forEach(pack => {
+        if (pack.prix) {
+          total += pack.prix;
+        }
+      });
+    }
   
-    // Ajouter les lignes supplémentaires
-    devis.lignesSupplementaires.forEach(ligne => {
-      total += ligne.prix * ligne.quantite;
-    });
+    // Vérifier et ajouter les lignes supplémentaires
+    if (devis.lignesSupplementaires && devis.lignesSupplementaires.length > 0) {
+      devis.lignesSupplementaires.forEach(ligne => {
+        if (ligne.prix && ligne.quantite) {
+          total += ligne.prix * ligne.quantite;
+        }
+      });
+    }
   
-    // Calculer le salaire des mécaniciens en fonction de leur heure de travail et de leur tarif horaire
-    devis.mecaniciensTravaillant.forEach(mecanicien => {
-      if (mecanicien.mecanicien && mecanicien.mecanicien.tarifHoraire) {
-        total += mecanicien.heureDeTravail * mecanicien.mecanicien.tarifHoraire;
-      }
-    });
+    // Vérifier et calculer le salaire des mécaniciens en fonction de leur heure de travail et de leur tarif horaire
+    if (devis.mecaniciensTravaillant && devis.mecaniciensTravaillant.length > 0) {
+      devis.mecaniciensTravaillant.forEach(mecanicien => {
+        if (mecanicien.mecanicien && mecanicien.mecanicien.tarifHoraire && mecanicien.heureDeTravail) {
+          total += mecanicien.heureDeTravail * mecanicien.mecanicien.tarifHoraire;
+        }
+      });
+    }
   
     // Mettre à jour le total
     devis.total = total;
     await devis.save();
   }
+  
   
 
   // Marquer le devis comme "terminé"
