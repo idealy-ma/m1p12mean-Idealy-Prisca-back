@@ -166,7 +166,8 @@ class DevisService extends BaseService {
 
   // Récupérer tous les devis d'un client
   async getDevisByClient(clientId) {
-    return await this.repository.model.find({ client: clientId }).populate('servicesChoisis.service').populate('packsChoisis.servicePack');
+    return await this.repository.model.find({ client: clientId }).populate('vehicule', 'immatricule marque modele')
+    .populate('reponduPar', 'nom prenom').populate('servicesChoisis.service').populate('packsChoisis.servicePack');
   }
 
 }
