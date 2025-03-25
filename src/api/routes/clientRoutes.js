@@ -17,4 +17,8 @@ router.post('/vehicules', vehiculeController.createVehicule);
 
 // Créer un devis
 router.post('/devis', DevisController.createDevis);
+// Obtenir tous les devis d'un client
+router.get('/devis/:clientId', DevisController.getDevisByClient);
+router.get('/devis/:id', DevisController.getDevisById);
+
 module.exports = router; 
