@@ -164,6 +164,25 @@ getDevisByClient = async (req, res, next) => {
     next(error);
   }
 };
+async assignMecaniciens(req, res, next) {
+  try {
+    const { devisId, mecaniciensIds, heuresDeTravail } = req.body;
+
+    if (!devisId || !mecaniciensIds || !heuresDeTravail) {
+      return res.status(400).json({ message: "Tous les champs sont requis." });
+    }
+
+    // Appel de la méthode du service pour assigner les mécaniciens
+    const devis = await DevisService.assignMecaniciens(devisId, mecaniciensIds, heuresDeTravail);
+
+    return res.status(200).json({
+      message: 'Mécaniciens assignés avec succès.',
+      devis
+    });
+  } catch (error) {
+    next(error); // Gestion des erreurs
+  }
+}
 
 
 }
