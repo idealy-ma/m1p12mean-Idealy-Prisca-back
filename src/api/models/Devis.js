@@ -1,6 +1,5 @@
 const mongoose = require('mongoose');
 const BaseModel = require('./BaseModel');
-
 const devisSchema = new mongoose.Schema({
   client: {
     type: mongoose.Schema.Types.ObjectId,
@@ -18,19 +17,33 @@ const devisSchema = new mongoose.Schema({
   },
   servicesChoisis: [{
     service: { type: mongoose.Schema.Types.ObjectId, ref: 'Service' },
-    prix: Number
+    note: { type: String },
+    priorite: { type: String },
+    completed: Boolean
   }],
   packsChoisis: [{
     servicePack: { type: mongoose.Schema.Types.ObjectId, ref: 'ServicePack' },
-    prix: Number
+    note: { type: String },
+    priorite: { type: String },
+    completed: Boolean
   }],
   lignesSupplementaires: [{
-    description: { type: String },  // Optionnel : Le responsable peut rédiger une description
-    prix: { type: Number, required: true },  // Obligatoire : Le prix doit être défini pour chaque ligne
-    quantite: Number,
-    type:String,
-    note:String,
-    priorite:String
+    nom: { type: String }, 
+    prix: { type: Number, required: true },
+    quantite:  { type: Number },
+    type: { type: String },
+    note: { type: String },
+    priorite: { type: String },
+    completed: Boolean
+  }],
+  mecaniciensTravaillant:[{
+    mecanicien: { type: mongoose.Schema.Types.ObjectId, ref: 'Users' }, 
+    note: { type: String },
+    heureDeTravail: { type: Number },
+    debut: { 
+      type: Date, 
+      default: null 
+    }    
   }],
   total: {
     type: Number,
@@ -82,29 +95,38 @@ class Devis extends BaseModel {
    async updateTotal(devisId) {
     const devis = await DevisModel.findById(devisId)
       .populate('servicesChoisis.service')
-      .populate('packsChoisis.servicePack');
+      .populate('packsChoisis.servicePack')
+      .populate('mecaniciensTravaillant.mecanicien'); // Assurez-vous de peupler les mécaniciens pour obtenir leurs informations
     
     let total = 0;
-    
+  
     // Calculer le prix des services choisis
     devis.servicesChoisis.forEach(service => {
       total += service.prix;
     });
-    
+  
     // Calculer le prix des packs choisis
     devis.packsChoisis.forEach(pack => {
       total += pack.prix;
     });
-    
+  
     // Ajouter les lignes supplémentaires
     devis.lignesSupplementaires.forEach(ligne => {
-      total += ligne.prix*ligne.quantite;
+      total += ligne.prix * ligne.quantite;
     });
-    
+  
+    // Calculer le salaire des mécaniciens en fonction de leur heure de travail et de leur tarif horaire
+    devis.mecaniciensTravaillant.forEach(mecanicien => {
+      if (mecanicien.mecanicien && mecanicien.mecanicien.tarifHoraire) {
+        total += mecanicien.heureDeTravail * mecanicien.mecanicien.tarifHoraire;
+      }
+    });
+  
     // Mettre à jour le total
     devis.total = total;
     await devis.save();
   }
+  
 
   // Marquer le devis comme "terminé"
   async finalizeDevis(devisId) {

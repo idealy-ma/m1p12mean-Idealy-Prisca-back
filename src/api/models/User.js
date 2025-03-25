@@ -44,11 +44,17 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  tarifHoraire: {
+    type: Number,
+    required: function() { return this.role === 'mecanicien'; }, // Ajoute une condition pour rendre ce champ requis seulement si le rôle est 'mecanicien'
+    min: [0, 'Le tarif horaire doit être un nombre positif'] // Optionnel: validation du tarif horaire
+  }
 }, {
   timestamps: true, // Ajoute createdAt et updatedAt
   toJSON: { virtuals: true },
   toObject: { virtuals: true }
 });
+
 
 // Méthode pour vérifier si le mot de passe est correct (à implémenter avec bcrypt)
 userSchema.methods.verifierMotDePasse = function(motDePasseCandidat) {
