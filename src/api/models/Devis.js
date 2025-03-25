@@ -51,6 +51,13 @@ const devisSchema = new mongoose.Schema({
   reponduPar: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
+  },
+  preferredDate:{
+    type: Date
+  },
+  urlPhotos: {
+    type: [String],
+    default: []     
   }
 }, {
   timestamps: true,
