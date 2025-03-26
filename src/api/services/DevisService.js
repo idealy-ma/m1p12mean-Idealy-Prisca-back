@@ -1,5 +1,6 @@
 const BaseService = require('./BaseService');
 const DevisModel = require('../models/Devis');
+const UserModel = require('../models/User');
 const mongoose = require('mongoose');
 
 /**
@@ -164,6 +165,16 @@ class DevisService extends BaseService {
     await DevisModel.finalizeDevis(devisId);
     return { message: 'Devis envoyé avec succès' };
   }
+  // accepter le devis
+  async acceptDevis(devisId) {
+    await DevisModel.acceptDevis(devisId);
+    return { message: 'Devis acepte avec succès' };
+  }
+  // accepter le devis
+  async refuserDevis(devisId) {
+    await DevisModel.declineDevis(devisId);
+    return { message: 'Devis refuse' };
+  }
 
   // Récupérer tous les devis d'un client
   async getDevisByClient(clientId) {
@@ -301,6 +312,43 @@ async assignMecaniciens(devisId, mecaniciensIds, heuresDeTravail) {
   return devis; // Retourne le devis mis à jour
 }
 
+async getUnavailableDates() {
+  // Récupérer tous les devis en cours
+  const devisEnCours = await this.repository.model.find({
+    status: { $in: ['en_attente', 'accepte'] } // Filtrer les devis actifs
+  }).populate('mecaniciensTravaillant.mecanicien');
+
+  // Récupérer tous les mécaniciens
+  const mecaniciens = await UserModel.find({ role: 'mecanicien' });
+  // Création d'un objet pour stocker les jours où chaque mécanicien travaille
+  let occupation = {};
+
+  devisEnCours.forEach(devis => {
+    devis.mecaniciensTravaillant.forEach(mecanicienData => {
+      const { mecanicien, debut, heureDeTravail } = mecanicienData;
+
+      if (mecanicien && debut) {
+        let dateTravail = new Date(debut);
+        let dureeTravail = Math.ceil(heureDeTravail / 8); // Nombre de jours arrondi (ex: 10h -> 2 jours)
+
+        for (let i = 0; i < dureeTravail; i++) {
+          let jourTravail = dateTravail.toISOString().split('T')[0]; // Convertir en format YYYY-MM-DD
+
+          if (!occupation[jourTravail]) {
+            occupation[jourTravail] = new Set();
+          }
+          occupation[jourTravail].add(mecanicien._id.toString()); // Ajouter le mécanicien
+          dateTravail.setDate(dateTravail.getDate() + 1);
+        }
+      }
+    });
+  });
+
+  // Trouver les jours où tous les mécaniciens sont occupés
+  let datesBloquees = Object.keys(occupation).filter(date => occupation[date].size >= mecaniciens.length);
+
+  return datesBloquees; // Retourne une liste de dates en format YYYY-MM-DD
+}
 }
 
 module.exports = new DevisService(); 
