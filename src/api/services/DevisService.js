@@ -171,6 +171,89 @@ class DevisService extends BaseService {
     .populate('reponduPar', 'nom prenom').populate('servicesChoisis.service').populate('packsChoisis.servicePack')
     .populate('mecaniciensTravaillant.mecanicien', 'nom prenom tarifHoraire');
   }
+
+  /**
+   * Récupère les devis d'un client avec pagination et filtrage
+   * @param {string} clientId - L'ID du client
+   * @param {Object} filter - Filtre pour la recherche (status, date, etc.)
+   * @param {Object} options - Options pour la pagination (page, limit, sort)
+   * @returns {Promise<Object>} Les devis trouvés avec métadonnées de pagination
+   */
+  async getDevisByClientWithPagination(clientId, filter = {}, options = {}) {
+    try {
+      // Valeurs par défaut pour la pagination
+      const page = parseInt(options.page, 10) || 1;
+      const limit = parseInt(options.limit, 10) || 10;
+      const skip = (page - 1) * limit;
+      
+      // Options de tri (par défaut: date de création décroissante)
+      const sort = options.sort || { dateCreation: -1 };
+      
+      // Construction du filtre de base avec l'ID du client
+      const queryFilter = { client: clientId };
+      
+      // Ajouter le filtre de statut si présent
+      if (filter.status) {
+        queryFilter.status = filter.status;
+      }
+      
+      // Filtrage par plage de dates si spécifié
+      if (filter.dateDebut || filter.dateFin) {
+        queryFilter.dateCreation = {};
+        
+        if (filter.dateDebut) {
+          queryFilter.dateCreation.$gte = new Date(filter.dateDebut);
+        }
+        
+        if (filter.dateFin) {
+          queryFilter.dateCreation.$lte = new Date(filter.dateFin);
+        }
+      }
+      
+      // Recherche textuelle si spécifiée
+      if (filter.search) {
+        // Recherche dans la description ou problème
+        queryFilter.$or = [
+          { probleme: { $regex: filter.search, $options: 'i' } }
+        ];
+      }
+      
+      // Exécuter la requête avec pagination
+      const devis = await this.repository.model.find(queryFilter)
+        .populate('vehicule', 'immatricule marque modele')
+        .populate('reponduPar', 'nom prenom')
+        .populate('servicesChoisis.service')
+        .populate('packsChoisis.servicePack')
+        .populate('mecaniciensTravaillant.mecanicien', 'nom prenom tarifHoraire')
+        .sort(sort)
+        .skip(skip)
+        .limit(limit);
+      
+      // Compter le nombre total de documents pour la pagination
+      const total = await this.repository.model.countDocuments(queryFilter);
+      
+      // Calculer les métadonnées de pagination
+      const totalPages = Math.ceil(total / limit);
+      const hasNext = page < totalPages;
+      const hasPrev = page > 1;
+      
+      return {
+        devis,
+        pagination: {
+          total,
+          page,
+          limit,
+          totalPages,
+          hasNext,
+          hasPrev
+        }
+      };
+    } catch (error) {
+      console.error('Erreur dans getDevisByClientWithPagination:', error);
+      throw error;
+    }
+  }
+
   /**
  * Assigner un ou plusieurs mécaniciens à un devis.
  * 
