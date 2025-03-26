@@ -20,9 +20,10 @@ router.post('/vehicules', vehiculeController.createVehicule);
 router.post('/devis', DevisController.createDevis);
 // Obtenir tous les devis d'un client
 router.get('/devis/:clientId', DevisController.getDevisByClient);
+router.get('/devis', DevisController.getMyDevis);
 router.get('/devis/:id', DevisController.getDevisById);
 
-router.get('/service', ServiceController.getAllServices);
-router.get('/servicePack', ServicePackController.getAllServicesPack);
+router.get('/services', ServiceController.getAllServices);
+router.get('/servicePacks', ServicePackController.getAllServicesPack);
 
 module.exports = router; 
