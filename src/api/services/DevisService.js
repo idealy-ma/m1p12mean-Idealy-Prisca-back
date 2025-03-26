@@ -75,8 +75,6 @@ class DevisService extends BaseService {
         ];
       }
       
-      console.log('Filtre final pour la requête:', JSON.stringify(queryFilter));
-      
       // Exécuter la requête avec pagination
       const devis = await this.repository.model.find(queryFilter)
         .populate('client', 'nom prenom email')
