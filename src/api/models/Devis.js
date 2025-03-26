@@ -144,7 +144,20 @@ class Devis extends BaseModel {
     await devis.save();
   }
   
-  
+  // Marquer le devis comme "terminé"
+  async acceptDevis(devisId) {
+    const devis = await DevisModel.findById(devisId);
+    devis.status = 'accepte';
+    devis.dateReponse = new Date();
+    await devis.save();
+  }
+  // Marquer le devis comme "terminé"
+  async declineDevis(devisId) {
+    const devis = await DevisModel.findById(devisId);
+    devis.status = 'refuse';
+    devis.dateReponse = new Date();
+    await devis.save();
+  }
 
   // Marquer le devis comme "terminé"
   async finalizeDevis(devisId) {
@@ -153,6 +166,7 @@ class Devis extends BaseModel {
     devis.dateReponse = new Date();
     await devis.save();
   }
+  
 }
 
 module.exports = new Devis(); 
