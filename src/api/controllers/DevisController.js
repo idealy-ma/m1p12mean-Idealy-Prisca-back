@@ -164,6 +164,16 @@ getDevisByClient = async (req, res, next) => {
     next(error);
   }
 };
+
+getMyDevis = async (req, res, next) => {
+  try {
+    const devis = await this.service.getDevisByClient(req.user._id);
+    res.status(200).json(devis);
+  } catch (error) {
+    next(error);
+  }
+};
+
 async assignMecaniciens(req, res, next) {
   try {
     const { devisId, mecaniciensIds, heuresDeTravail } = req.body;
