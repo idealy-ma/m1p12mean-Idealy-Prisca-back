@@ -153,6 +153,24 @@ finalizeDevis = async (req, res, next) => {
     next(error);
   }
 };
+accepteDevis = async (req, res, next) => {
+  try {
+    const { devisId } = req.params;
+    const result = await this.service.acceptDevis(devisId);
+    res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+declineDevis = async (req, res, next) => {
+  try {
+    const { devisId } = req.params;
+    const result = await this.service.refuserDevis(devisId);
+    res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
 
 // Obtenir tous les devis d'un client
 getDevisByClient = async (req, res, next) => {
@@ -237,6 +255,15 @@ async assignMecaniciens(req, res, next) {
     next(error); // Gestion des erreurs
   }
 }
+getUnavailableDates = async (req, res) => {
+  try {
+    const datesBloquees = await DevisService.getUnavailableDates();
+    return res.json({ success: true, dates: datesBloquees });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 
 }
 

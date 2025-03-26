@@ -22,6 +22,10 @@ router.post('/devis', DevisController.createDevis);
 router.get('/devis/:clientId', DevisController.getDevisByClient);
 router.get('/devis', DevisController.getMyDevis);
 router.get('/devis/:id', DevisController.getDevisById);
+// Route pour récupérer les dates indisponibles
+router.get('/dates-indisponibles', DevisController.getUnavailableDates);
+router.post('/devis/:devisId/accept', DevisController.accepteDevis);
+router.post('/devis/:devisId/decline', DevisController.declineDevis);
 
 router.get('/services', ServiceController.getAllServices);
 router.get('/servicePacks', ServicePackController.getAllServicesPack);
