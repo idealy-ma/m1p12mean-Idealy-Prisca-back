@@ -137,30 +137,6 @@ class Devis extends BaseModel {
         }
       });
     }
-    
-    let total = 0;
-  
-    // Calculer le prix des services choisis
-    devis.servicesChoisis.forEach(service => {
-      total += service.prix;
-    });
-  
-    // Calculer le prix des packs choisis
-    devis.packsChoisis.forEach(pack => {
-      total += pack.prix;
-    });
-  
-    // Ajouter les lignes supplémentaires
-    devis.lignesSupplementaires.forEach(ligne => {
-      total += ligne.prix * ligne.quantite;
-    });
-  
-    // Calculer le salaire des mécaniciens en fonction de leur heure de travail et de leur tarif horaire
-    devis.mecaniciensTravaillant.forEach(mecanicien => {
-      if (mecanicien.mecanicien && mecanicien.mecanicien.tarifHoraire) {
-        total += mecanicien.heureDeTravail * mecanicien.mecanicien.tarifHoraire;
-      }
-    });
   
     // Mettre à jour le total
     devis.total = total;
