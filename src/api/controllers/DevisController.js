@@ -165,10 +165,54 @@ getDevisByClient = async (req, res, next) => {
   }
 };
 
+/**
+ * Récupère les devis du client connecté avec pagination et filtrage avancé
+ * @param {Object} req - Requête Express
+ * @param {Object} res - Réponse Express
+ * @param {Object} next - Fonction next d'Express
+ */
 getMyDevis = async (req, res, next) => {
   try {
-    const devis = await this.service.getDevisByClient(req.user._id);
-    res.status(200).json(devis);
+    // Extraire les paramètres de requête pour le filtrage et la pagination
+    const { 
+      status, 
+      dateDebut, 
+      dateFin, 
+      search, 
+      page = 1, 
+      limit = 10,
+      sortField = 'dateCreation',
+      sortOrder = 'desc'
+    } = req.query;
+    
+    // Construire le filtre
+    let filter = {};
+    
+    // Ajouter les filtres si présents
+    if (status) filter.status = status;
+    if (dateDebut) filter.dateDebut = dateDebut;
+    if (dateFin) filter.dateFin = dateFin;
+    if (search) filter.search = search;
+    
+    // Options de pagination et tri
+    const options = {
+      page: parseInt(page),
+      limit: parseInt(limit),
+      sort: {}
+    };
+    options.sort[sortField] = sortOrder === 'desc' ? -1 : 1;
+    
+    // Utiliser le service pour récupérer les devis avec pagination
+    const result = await this.service.getDevisByClientWithPagination(req.user._id, filter, options);
+    
+    res.status(200).json({
+      success: true,
+      message: 'Mes devis récupérés avec succès',
+      count: result.devis.length,
+      total: result.pagination.total,
+      pagination: result.pagination,
+      data: result.devis
+    });
   } catch (error) {
     next(error);
   }
@@ -193,7 +237,6 @@ async assignMecaniciens(req, res, next) {
     next(error); // Gestion des erreurs
   }
 }
-
 
 }
 
