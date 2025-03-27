@@ -283,6 +283,37 @@ toggleTask= async (req, res, next) => {
   }
 };
 
+async getDevisForMecanicien(req, res, next) {
+  const mecanicienId = req.user._id; // ID du mécanicien connecté
+  
+  try {
+    const devis = await DevisService.listDevisForMecanicien(mecanicienId);
+    
+    const devisWithTasks = await Promise.all(
+      devis.map(async (devisItem) => {
+        const tasks = await DevisService.listTasksForDevis(devisItem._id);
+        return { ...devisItem.toObject(), tasks };
+      })
+    );
+
+    return res.status(200).json(devisWithTasks);
+  } catch (error) {
+    next(error); // Gestion des erreurs
+  }
+}
+
+// Récupérer toutes les tâches d'un devis spécifique
+async getTasksForDevis(req, res, next) {
+  const { devisId } = req.params; // Récupérer l'ID du devis depuis les paramètres de l'URL
+
+  try {
+    const tasks = await DevisService.listTasksForDevis(devisId);
+    return res.status(200).json(tasks);
+  } catch (error) {
+    next(error); // Gestion des erreurs
+  }
+}
+
 }
 
 module.exports = new DevisController(); 
