@@ -403,7 +403,7 @@ async toggleTask(devisId, taskId, mecanicienId, type) {
 
   return task; // Retourner la tâche mise à jour
 }
-async listDevisForMecanicien(mecanicienId, options = {}) {
+async listDevisForMecanicien(mecanicienId, filter = {}, options = {}) {
   try {
     // Valeurs par défaut pour la pagination
     const page = parseInt(options.page, 10) || 1;
@@ -413,10 +413,35 @@ async listDevisForMecanicien(mecanicienId, options = {}) {
     // Options de tri (par défaut: date de création décroissante)
     const sort = options.sort || { dateCreation: -1 };
 
-    // Filtrer les devis où le mécanicien est impliqué
+    // Construction du filtre de base
     const queryFilter = {
       'mecaniciensTravaillant.mecanicien': mecanicienId
     };
+
+    // Ajouter le filtre de statut si présent
+    if (filter.status) {
+      queryFilter.status = filter.status;
+    }
+
+    // Filtrage par plage de dates si spécifié
+    if (filter.dateDebut || filter.dateFin) {
+      queryFilter.dateCreation = {};
+      
+      if (filter.dateDebut) {
+        queryFilter.dateCreation.$gte = new Date(filter.dateDebut);
+      }
+      
+      if (filter.dateFin) {
+        queryFilter.dateCreation.$lte = new Date(filter.dateFin);
+      }
+    }
+
+    // Recherche textuelle si spécifiée
+    if (filter.search) {
+      queryFilter.$or = [
+        { probleme: { $regex: filter.search, $options: 'i' } }
+      ];
+    }
 
     // Exécuter la requête avec pagination
     const devis = await this.repository.model.find(queryFilter)
@@ -451,9 +476,11 @@ async listDevisForMecanicien(mecanicienId, options = {}) {
       }
     };
   } catch (error) {
-    throw new Error('Erreur lors de la récupération des devis: ' + error.message);
+    console.error('Erreur dans listDevisForMecanicien:', error);
+    throw error;
   }
 }
+
 
 async listTasksForDevis(devisId) {
   try {
