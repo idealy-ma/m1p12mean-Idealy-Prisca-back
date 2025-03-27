@@ -283,6 +283,82 @@ toggleTask= async (req, res, next) => {
   }
 };
 
+async getDevisForMecanicien(req, res, next) {
+  const mecanicienId = req.user._id; // ID du mécanicien connecté
+
+  try {
+    // Extraire les paramètres de requête pour le filtrage et la pagination
+    const { 
+      status, 
+      dateDebut, 
+      dateFin, 
+      search, 
+      page = 1, 
+      limit = 10,
+      sortField = 'dateCreation',
+      sortOrder = 'desc'
+    } = req.query;
+
+    // Construire le filtre
+    let filter = {
+      'mecaniciensTravaillant.mecanicien': mecanicienId
+    };
+
+    if (status) filter.status = status;
+    if (dateDebut || dateFin) {
+      filter.dateCreation = {};
+      if (dateDebut) filter.dateCreation.$gte = new Date(dateDebut);
+      if (dateFin) filter.dateCreation.$lte = new Date(dateFin);
+    }
+    if (search) {
+      filter.$or = [{ probleme: { $regex: search, $options: 'i' } }];
+    }
+
+    // Options de pagination et tri
+    const options = {
+      page: parseInt(page),
+      limit: parseInt(limit),
+      sort: { [sortField]: sortOrder === 'desc' ? -1 : 1 }
+    };
+
+    // Récupérer les devis filtrés et paginés
+    const result = await DevisService.listDevisForMecanicien(mecanicienId, filter, options);
+
+    // Ajouter les tâches associées aux devis
+    const devisWithTasks = await Promise.all(
+      result.devis.map(async (devisItem) => {
+        const tasks = await DevisService.listTasksForDevis(devisItem._id);
+        return { ...devisItem.toObject(), tasks };
+      })
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Devis du mécanicien récupérés avec succès',
+      count: devisWithTasks.length,
+      total: result.pagination.total,
+      pagination: result.pagination,
+      data: devisWithTasks
+    });
+
+  } catch (error) {
+    next(error);
+  }
+}
+
+
+// Récupérer toutes les tâches d'un devis spécifique
+async getTasksForDevis(req, res, next) {
+  const { devisId } = req.params; // Récupérer l'ID du devis depuis les paramètres de l'URL
+
+  try {
+    const tasks = await DevisService.listTasksForDevis(devisId);
+    return res.status(200).json(tasks);
+  } catch (error) {
+    next(error); // Gestion des erreurs
+  }
+}
+
 }
 
 module.exports = new DevisController(); 

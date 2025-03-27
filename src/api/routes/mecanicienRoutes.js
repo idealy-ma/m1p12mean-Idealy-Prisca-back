@@ -13,6 +13,11 @@ router.use(authorize('mecanicien'));
 
 // Route pour basculer l'état de la tâche (checkbox)
 router.patch('/toggle-task', DevisController.toggleTask);
+router.get('/devis', DevisController.getDevisForMecanicien);
+
+// Route pour obtenir toutes les tâches d'un devis spécifique
+router.get('/devis/:devisId/tasks', DevisController.getTasksForDevis);
+
 // Par exemple, gestion des réparations, des rendez-vous, etc.
 router.get('/dashboard', (req, res) => {
   res.status(200).json({

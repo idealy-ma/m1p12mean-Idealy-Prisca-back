@@ -26,6 +26,7 @@ router.get('/devis/:id', DevisController.getDevisById);
 router.get('/dates-indisponibles', DevisController.getUnavailableDates);
 router.post('/devis/:devisId/accept', DevisController.accepteDevis);
 router.post('/devis/:devisId/decline', DevisController.declineDevis);
+router.get('/devis/:devisId/tasks', DevisController.getTasksForDevis);
 
 router.get('/services', ServiceController.getAllServices);
 router.get('/servicePacks', ServicePackController.getAllServicesPack);

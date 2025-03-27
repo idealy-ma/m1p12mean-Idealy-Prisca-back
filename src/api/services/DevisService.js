@@ -403,6 +403,151 @@ async toggleTask(devisId, taskId, mecanicienId, type) {
 
   return task; // Retourner la tâche mise à jour
 }
+async listDevisForMecanicien(mecanicienId, filter = {}, options = {}) {
+  try {
+    // Valeurs par défaut pour la pagination
+    const page = parseInt(options.page, 10) || 1;
+    const limit = parseInt(options.limit, 10) || 10;
+    const skip = (page - 1) * limit;
+
+    // Options de tri (par défaut: date de création décroissante)
+    const sort = options.sort || { dateCreation: -1 };
+
+    // Construction du filtre de base
+    const queryFilter = {
+      'mecaniciensTravaillant.mecanicien': mecanicienId
+    };
+
+    // Ajouter le filtre de statut si présent
+    if (filter.status) {
+      queryFilter.status = filter.status;
+    }
+
+    // Filtrage par plage de dates si spécifié
+    if (filter.dateDebut || filter.dateFin) {
+      queryFilter.dateCreation = {};
+      
+      if (filter.dateDebut) {
+        queryFilter.dateCreation.$gte = new Date(filter.dateDebut);
+      }
+      
+      if (filter.dateFin) {
+        queryFilter.dateCreation.$lte = new Date(filter.dateFin);
+      }
+    }
+
+    // Recherche textuelle si spécifiée
+    if (filter.search) {
+      queryFilter.$or = [
+        { probleme: { $regex: filter.search, $options: 'i' } }
+      ];
+    }
+
+    // Exécuter la requête avec pagination
+    const devis = await this.repository.model.find(queryFilter)
+      .populate([
+        { path: 'client', select: 'nom email' },
+        { path: 'vehicule', select: 'marque modele' },
+        { path: 'servicesChoisis.service', select: 'nom prix' },
+        { path: 'packsChoisis.servicePack', select: 'nom prix remise' },
+        { path: 'lignesSupplementaires', select: 'nom prix quantite type' }
+      ])
+      .sort(sort)
+      .skip(skip)
+      .limit(limit);
+
+    // Compter le nombre total de devis pour la pagination
+    const total = await this.repository.model.countDocuments(queryFilter);
+
+    // Calculer les métadonnées de pagination
+    const totalPages = Math.ceil(total / limit);
+    const hasNext = page < totalPages;
+    const hasPrev = page > 1;
+
+    return {
+      devis,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages,
+        hasNext,
+        hasPrev
+      }
+    };
+  } catch (error) {
+    console.error('Erreur dans listDevisForMecanicien:', error);
+    throw error;
+  }
+}
+
+
+async listTasksForDevis(devisId) {
+  try {
+    // Trouver le devis par son ID
+    const devis = await this.repository.model.findById(devisId).populate([
+      {
+        path: 'servicesChoisis.service',
+        select: 'nom prix'
+      },
+      {
+        path: 'packsChoisis.servicePack',
+        select: 'nom prix remise'
+      },
+      {
+        path: 'lignesSupplementaires',
+        select: 'nom prix quantite type'
+      }
+    ]);
+
+    // Vérifier si le devis existe
+    if (!devis) {
+      throw new Error('Le devis spécifié n\'existe pas');
+    }
+
+    const tasks = [];
+
+    // Ajouter les servicesChoisis
+    devis.servicesChoisis.forEach(task => {
+      tasks.push({
+        type: 'service',
+        taskId: task._id,
+        name: task.service.nom,
+        prix: task.prix,
+        completed: task.completed,
+        priorite: task.priorite
+      });
+    });
+
+    // Ajouter les packsChoisis
+    devis.packsChoisis.forEach(task => {
+      tasks.push({
+        type: 'pack',
+        taskId: task._id,
+        name: task.servicePack.nom,
+        prix: task.prix,
+        completed: task.completed,
+        priorite: task.priorite
+      });
+    });
+
+    // Ajouter les lignesSupplementaires
+    devis.lignesSupplementaires.forEach(task => {
+      tasks.push({
+        type: 'ligneSupplementaire',
+        taskId: task._id,
+        name: task.nom,
+        prix: task.prix,
+        completed: task.completed,
+        priorite: task.priorite
+      });
+    });
+
+    return tasks; // Retourne la liste des tâches
+  } catch (error) {
+    throw new Error('Erreur lors de la récupération des tâches du devis: ' + error.message);
+  }
+}
 
 
 }
