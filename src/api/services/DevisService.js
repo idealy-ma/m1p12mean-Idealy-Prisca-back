@@ -403,44 +403,58 @@ async toggleTask(devisId, taskId, mecanicienId, type) {
 
   return task; // Retourner la tâche mise à jour
 }
-async listDevisForMecanicien(mecanicienId) {
+async listDevisForMecanicien(mecanicienId, options = {}) {
   try {
-    // Trouver tous les devis où le mécanicien est dans le tableau 'mecaniciensTravaillant'
-    const devis = await this.repository.model.find({
+    // Valeurs par défaut pour la pagination
+    const page = parseInt(options.page, 10) || 1;
+    const limit = parseInt(options.limit, 10) || 10;
+    const skip = (page - 1) * limit;
+
+    // Options de tri (par défaut: date de création décroissante)
+    const sort = options.sort || { dateCreation: -1 };
+
+    // Filtrer les devis où le mécanicien est impliqué
+    const queryFilter = {
       'mecaniciensTravaillant.mecanicien': mecanicienId
-    }).populate([
-      {
-        path: 'client',
-        select: 'nom email' // Populer avec les informations du client, par exemple
-      },
-      {
-        path: 'vehicule',
-        select: 'marque modele' // Populer avec les informations du véhicule
-      },
-      {
-        path: 'servicesChoisis.service',
-        select: 'nom prix' // Populer avec les informations du service choisi
-      },
-      {
-        path: 'packsChoisis.servicePack',
-        select: 'nom prix remise' // Populer avec les informations du pack de services choisi
-      },
-      {
-        path: 'lignesSupplementaires',
-        select: 'nom prix quantite type'
+    };
+
+    // Exécuter la requête avec pagination
+    const devis = await this.repository.model.find(queryFilter)
+      .populate([
+        { path: 'client', select: 'nom email' },
+        { path: 'vehicule', select: 'marque modele' },
+        { path: 'servicesChoisis.service', select: 'nom prix' },
+        { path: 'packsChoisis.servicePack', select: 'nom prix remise' },
+        { path: 'lignesSupplementaires', select: 'nom prix quantite type' }
+      ])
+      .sort(sort)
+      .skip(skip)
+      .limit(limit);
+
+    // Compter le nombre total de devis pour la pagination
+    const total = await this.repository.model.countDocuments(queryFilter);
+
+    // Calculer les métadonnées de pagination
+    const totalPages = Math.ceil(total / limit);
+    const hasNext = page < totalPages;
+    const hasPrev = page > 1;
+
+    return {
+      devis,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages,
+        hasNext,
+        hasPrev
       }
-    ]);
-
-    // Si aucun devis trouvé
-    if (!devis) {
-      throw new Error('Aucun devis trouvé pour ce mécanicien.');
-    }
-
-    return devis;
+    };
   } catch (error) {
     throw new Error('Erreur lors de la récupération des devis: ' + error.message);
   }
 }
+
 async listTasksForDevis(devisId) {
   try {
     // Trouver le devis par son ID

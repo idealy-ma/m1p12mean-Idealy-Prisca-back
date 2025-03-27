@@ -282,25 +282,42 @@ toggleTask= async (req, res, next) => {
     });
   }
 };
-
 async getDevisForMecanicien(req, res, next) {
   const mecanicienId = req.user._id; // ID du mécanicien connecté
   
   try {
-    const devis = await DevisService.listDevisForMecanicien(mecanicienId);
+    // Extraire les paramètres de requête pour la pagination et le filtrage
+    const { 
+      page = 1, 
+      limit = 10, 
+      sortField = 'dateCreation', 
+      sortOrder = 'desc' 
+    } = req.query;
     
-    const devisWithTasks = await Promise.all(
-      devis.map(async (devisItem) => {
-        const tasks = await DevisService.listTasksForDevis(devisItem._id);
-        return { ...devisItem.toObject(), tasks };
-      })
-    );
-
-    return res.status(200).json(devisWithTasks);
+    const filter = {}; // Vous pouvez ajouter des filtres supplémentaires ici si nécessaire
+    
+    const options = {
+      page: parseInt(page, 10),
+      limit: parseInt(limit, 10),
+      sort: { [sortField]: sortOrder === 'desc' ? -1 : 1 }
+    };
+    
+    // Récupération des devis avec pagination
+    const result = await DevisService.listDevisForMecanicien(mecanicienId, filter, options);
+    
+    return res.status(200).json({
+      success: true,
+      message: 'Devis récupérés avec succès',
+      count: result.devis.length,
+      total: result.pagination.total,
+      pagination: result.pagination,
+      data: result.devis
+    });
   } catch (error) {
-    next(error); // Gestion des erreurs
+    next(error);
   }
 }
+
 
 // Récupérer toutes les tâches d'un devis spécifique
 async getTasksForDevis(req, res, next) {
