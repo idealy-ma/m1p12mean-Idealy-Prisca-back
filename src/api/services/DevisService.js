@@ -403,6 +403,110 @@ async toggleTask(devisId, taskId, mecanicienId, type) {
 
   return task; // Retourner la tâche mise à jour
 }
+async listDevisForMecanicien(mecanicienId) {
+  try {
+    // Trouver tous les devis où le mécanicien est dans le tableau 'mecaniciensTravaillant'
+    const devis = await this.repository.model.find({
+      'mecaniciensTravaillant.mecanicien': mecanicienId
+    }).populate([
+      {
+        path: 'client',
+        select: 'nom email' // Populer avec les informations du client, par exemple
+      },
+      {
+        path: 'vehicule',
+        select: 'marque modele' // Populer avec les informations du véhicule
+      },
+      {
+        path: 'servicesChoisis.service',
+        select: 'nom prix' // Populer avec les informations du service choisi
+      },
+      {
+        path: 'packsChoisis.servicePack',
+        select: 'nom prix remise' // Populer avec les informations du pack de services choisi
+      },
+      {
+        path: 'lignesSupplementaires',
+        select: 'nom prix quantite type'
+      }
+    ]);
+
+    // Si aucun devis trouvé
+    if (!devis) {
+      throw new Error('Aucun devis trouvé pour ce mécanicien.');
+    }
+
+    return devis;
+  } catch (error) {
+    throw new Error('Erreur lors de la récupération des devis: ' + error.message);
+  }
+}
+async listTasksForDevis(devisId) {
+  try {
+    // Trouver le devis par son ID
+    const devis = await this.repository.model.findById(devisId).populate([
+      {
+        path: 'servicesChoisis.service',
+        select: 'nom prix'
+      },
+      {
+        path: 'packsChoisis.servicePack',
+        select: 'nom prix remise'
+      },
+      {
+        path: 'lignesSupplementaires',
+        select: 'nom prix quantite type'
+      }
+    ]);
+
+    // Vérifier si le devis existe
+    if (!devis) {
+      throw new Error('Le devis spécifié n\'existe pas');
+    }
+
+    const tasks = [];
+
+    // Ajouter les servicesChoisis
+    devis.servicesChoisis.forEach(task => {
+      tasks.push({
+        type: 'service',
+        taskId: task._id,
+        name: task.service.nom,
+        prix: task.prix,
+        completed: task.completed,
+        priorite: task.priorite
+      });
+    });
+
+    // Ajouter les packsChoisis
+    devis.packsChoisis.forEach(task => {
+      tasks.push({
+        type: 'pack',
+        taskId: task._id,
+        name: task.servicePack.nom,
+        prix: task.prix,
+        completed: task.completed,
+        priorite: task.priorite
+      });
+    });
+
+    // Ajouter les lignesSupplementaires
+    devis.lignesSupplementaires.forEach(task => {
+      tasks.push({
+        type: 'ligneSupplementaire',
+        taskId: task._id,
+        name: task.nom,
+        prix: task.prix,
+        completed: task.completed,
+        priorite: task.priorite
+      });
+    });
+
+    return tasks; // Retourne la liste des tâches
+  } catch (error) {
+    throw new Error('Erreur lors de la récupération des tâches du devis: ' + error.message);
+  }
+}
 
 
 }
