@@ -349,6 +349,63 @@ async getUnavailableDates() {
 
   return datesBloquees; // Retourne une liste de dates en format YYYY-MM-DD
 }
+
+async toggleTask(devisId, taskId, mecanicienId, type) {
+  // Récupérer le devis par son ID
+  const devis = await this.repository.model.findById(devisId);
+  console.log(devis);
+  // Vérifier si le devis existe
+  if (!devis) {
+    throw new Error('Le devis n\'existe pas');
+  }
+
+  // Trouver la tâche dans le bon tableau (servicesChoisis, packsChoisis, ou lignesSupplementaires)
+  let taskArray;
+  if (type === 'servicesChoisis') {
+    taskArray = devis.servicesChoisis;
+  } else if (type === 'packsChoisis') {
+    taskArray = devis.packsChoisis;
+  } else if (type === 'lignesSupplementaires') {
+    taskArray = devis.lignesSupplementaires;
+  }
+
+  // Trouver la tâche correspondante par taskId
+  const task = taskArray.find(item => item._id.toString() === taskId);
+  
+  // Vérifier si la tâche a été trouvée
+  if (!task) {
+    throw new Error('Tâche non trouvée');
+  }
+
+  // Vérifier si le mécanicien fait partie des mécaniciens travaillant sur ce devis
+  const mecanicienPresent = devis.mecaniciensTravaillant.some(item => item.mecanicien.toString() === mecanicienId);
+  
+  if (!mecanicienPresent) {
+    throw new Error('Le mécanicien doit faire partie des mécaniciens travaillant sur ce devis');
+  }
+
+  // Vérifier si le mécanicien est celui qui a checké cette tâche
+  if (task.completed && task.completedBy && task.completedBy.toString() !== mecanicienId) {
+    throw new Error('Seul le mécanicien ayant marqué cette tâche peut la décocher');
+  }
+
+  // Basculer l'état de la tâche entre completed: true ou false
+  task.completed = !task.completed;
+
+  // Enregistrer ou retirer le mécanicien dans completedBy
+  if (task.completed) {
+    task.completedBy = mecanicienId;  // Enregistrer l'ID du mécanicien qui a coché la tâche
+  } else {
+    task.completedBy = null;  // Retirer l'ID du mécanicien si la tâche est décochée
+  }
+
+  // Sauvegarder les modifications dans le devis
+  await devis.save();
+
+  return task; // Retourner la tâche mise à jour
+}
+
+
 }
 
 module.exports = new DevisService(); 
