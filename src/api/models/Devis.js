@@ -17,31 +17,35 @@ const devisSchema = new mongoose.Schema({
   },
   servicesChoisis: [{
     service: { type: mongoose.Schema.Types.ObjectId, ref: 'Service' },
-    prix:Number,
+    prix: Number,
     note: { type: String },
     priorite: { type: String },
-    completed: Boolean
+    completed: Boolean,
+    completedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null } 
   }],
   packsChoisis: [{
     servicePack: { type: mongoose.Schema.Types.ObjectId, ref: 'ServicePack' },
-    prix:Number,
+    prix: Number,
     note: { type: String },
     priorite: { type: String },
-    completed: Boolean
+    completed: Boolean,
+    completedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }
   }],
   lignesSupplementaires: [{
+    _id: { type: mongoose.Schema.Types.ObjectId, auto: true }, // Ajout d'un ObjectId
     nom: { type: String }, 
     prix: { type: Number, required: true },
-    quantite:  { type: Number },
+    quantite: { type: Number },
     type: { type: String },
     note: { type: String },
     priorite: { type: String },
-    completed: Boolean
+    completed: Boolean,
+    completedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null } 
   }],
-  mecaniciensTravaillant:[{
+  mecaniciensTravaillant: [{
     mecanicien: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     note: { type: String },
-    tarifHoraire:Number,
+    tarifHoraire: Number,
     heureDeTravail: { type: Number },
     debut: { 
       type: Date, 
@@ -68,7 +72,7 @@ const devisSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   },
-  preferredDate:{
+  preferredDate: {
     type: Date
   },
   urlPhotos: {
@@ -80,6 +84,7 @@ const devisSchema = new mongoose.Schema({
   toJSON: { virtuals: true },
   toObject: { virtuals: true }
 });
+
 
 // Créer un index pour améliorer les performances des requêtes
 devisSchema.index({ client: 1, status: 1 });

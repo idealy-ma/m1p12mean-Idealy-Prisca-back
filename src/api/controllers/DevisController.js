@@ -263,7 +263,25 @@ getUnavailableDates = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+toggleTask= async (req, res, next) => {
+  try {
+    const { devisId, taskId, mecanicienId, type } = req.body; // Récupérer les données du body
 
+    // Appeler la fonction toggleTask
+    const updatedTask = await this.service.toggleTask(devisId, taskId, mecanicienId, type);
+
+    // Retourner la tâche mise à jour
+    return res.status(200).json({
+      message: 'Tâche mise à jour avec succès',
+      task: updatedTask
+    });
+  } catch (error) {
+    // En cas d'erreur, renvoyer une erreur 400
+    return res.status(400).json({
+      message: error.message || 'Erreur lors de la mise à jour de la tâche'
+    });
+  }
+};
 
 }
 
