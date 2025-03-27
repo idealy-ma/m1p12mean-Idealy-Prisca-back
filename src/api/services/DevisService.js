@@ -353,7 +353,6 @@ async getUnavailableDates() {
 async toggleTask(devisId, taskId, mecanicienId, type) {
   // Récupérer le devis par son ID
   const devis = await this.repository.model.findById(devisId);
-  console.log(devis);
   // Vérifier si le devis existe
   if (!devis) {
     throw new Error('Le devis n\'existe pas');
