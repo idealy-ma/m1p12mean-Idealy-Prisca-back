@@ -19,7 +19,6 @@ router.post('/vehicules', vehiculeController.createVehicule);
 // Créer un devis
 router.post('/devis', DevisController.createDevis);
 // Obtenir tous les devis d'un client
-router.get('/devis/:clientId', DevisController.getDevisByClient);
 router.get('/devis', DevisController.getMyDevis);
 router.get('/devis/:id', DevisController.getDevisById);
 // Route pour récupérer les dates indisponibles
