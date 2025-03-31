@@ -167,9 +167,33 @@ class Devis extends BaseModel {
   // Marquer le devis comme "terminé"
   async finalizeDevis(devisId) {
     const devis = await DevisModel.findById(devisId);
+    
+    if (!devis) {
+      console.error(`Devis non trouvé: ${devisId}`);
+      throw new Error('Devis non trouvé');
+    }
+
+    if (devis.status === 'accepte') {
+      throw new Error('Ce devis est déjà acceptee');
+    }
+
+    if (devis.status === 'refuse') {
+      throw new Error('Ce devis est déjà refusé');
+    }
+
+    console.log(`Finalisation du devis ${devisId} pour le client ${devis.client}`);
+    
     devis.status = 'termine';
     devis.dateReponse = new Date();
-    await devis.save();
+    
+    try {
+      await devis.save();
+      console.log(`Devis ${devisId} finalisé avec succès`);
+      return devis;
+    } catch (error) {
+      console.error(`Erreur lors de la finalisation du devis ${devisId}:`, error);
+      throw error;
+    }
   }
   
 }

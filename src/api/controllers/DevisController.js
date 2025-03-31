@@ -147,8 +147,47 @@ addLigneSupplementaire = async (req, res, next) => {
 finalizeDevis = async (req, res, next) => {
   try {
     const { devisId } = req.params;
-    const result = await this.service.finalizeDevis(devisId);
-    res.status(200).json(result);
+    
+    if (!devisId) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID du devis non fourni'
+      });
+    }
+    
+    // Récupérer les données de mise à jour du corps de la requête
+    const updateData = {
+      services: req.body.services || [],
+      packs: req.body.packs || [],
+      lignesSupplementaires: req.body.lignesSupplementaires || [],
+      mecaniciens: req.body.mecaniciens || []
+    };
+    
+    try {
+      // Appeler le service avec les données de mise à jour
+      const result = await this.service.finalizeDevis(devisId, updateData);
+      
+      return res.status(200).json({
+        success: true,
+        message: 'Devis finalisé et prêt à être consulté par le client',
+        devis: result.devis
+      });
+    } catch (error) {
+      // Gérer les erreurs spécifiques de validation
+      if (
+        error.message.includes('déjà finalisé') ||
+        error.message.includes('au moins un service') ||
+        error.message.includes('au moins un mécanicien')
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: error.message
+        });
+      }
+      
+      // Sinon, passer l'erreur au middleware d'erreur
+      throw error;
+    }
   } catch (error) {
     next(error);
   }
@@ -358,6 +397,70 @@ async getTasksForDevis(req, res, next) {
     next(error); // Gestion des erreurs
   }
 }
+
+// Ajouter un service à un devis existant
+addService = async (req, res, next) => {
+  try {
+    const { devisId } = req.params;
+    const serviceData = req.body;
+
+    if (!devisId) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID du devis non fourni'
+      });
+    }
+
+    // Validation des données du service
+    if (!serviceData.service || !serviceData.prix) {
+      return res.status(400).json({
+        success: false,
+        message: 'Les données du service sont incomplètes. Service ID et prix sont requis.'
+      });
+    }
+
+    const updatedDevis = await this.service.addService(devisId, serviceData);
+    res.status(200).json({
+      success: true,
+      message: 'Service ajouté avec succès au devis',
+      data: updatedDevis
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Ajouter un pack de services à un devis existant
+addServicePack = async (req, res, next) => {
+  try {
+    const { devisId } = req.params;
+    const packData = req.body;
+
+    if (!devisId) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID du devis non fourni'
+      });
+    }
+
+    // Validation des données du pack
+    if (!packData.servicePack || !packData.prix) {
+      return res.status(400).json({
+        success: false,
+        message: 'Les données du pack sont incomplètes. Pack ID et prix sont requis.'
+      });
+    }
+
+    const updatedDevis = await this.service.addServicePack(devisId, packData);
+    res.status(200).json({
+      success: true,
+      message: 'Pack de services ajouté avec succès au devis',
+      data: updatedDevis
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 }
 
