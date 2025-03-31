@@ -276,14 +276,53 @@ class DevisService extends BaseService {
     };
   }
   // accepter le devis
-  async acceptDevis(devisId) {
+  async acceptDevis(devisId, clientId) {
+    // Vérifier que le devis existe
+    const devis = await this.repository.model.findById(devisId);
+    if (!devis) {
+      throw new Error('Devis non trouvé');
+    }
+
+    // Vérifier que le client est bien le propriétaire du devis
+    if (devis.client.toString() !== clientId.toString()) {
+      throw new Error('Vous n\'êtes pas autorisé à accepter ce devis');
+    }
+
+    // Vérifier que le devis est en attente ou terminé
+    if (devis.status !== 'en_attente' && devis.status !== 'termine') {
+      throw new Error('Ce devis ne peut plus être accepté');
+    }
+
+    // Vérifier que le devis a au moins un service ou un pack
+    if (devis.servicesChoisis.length === 0 && devis.packsChoisis.length === 0 && devis.lignesSupplementaires.length === 0) {
+      throw new Error('Le devis doit contenir au moins un service ou un pack ou une ligne supplémentaire');
+    }
+
+    // Accepter le devis
     await DevisModel.acceptDevis(devisId);
-    return { message: 'Devis acepte avec succès' };
+    return { message: 'Devis accepté avec succès' };
   }
-  // accepter le devis
-  async refuserDevis(devisId) {
+  // refuser le devis
+  async refuserDevis(devisId, clientId) {
+    // Vérifier que le devis existe
+    const devis = await this.repository.model.findById(devisId);
+    if (!devis) {
+      throw new Error('Devis non trouvé');
+    }
+
+    // Vérifier que le client est bien le propriétaire du devis
+    if (devis.client.toString() !== clientId.toString()) {
+      throw new Error('Vous n\'êtes pas autorisé à refuser ce devis');
+    }
+
+    // Vérifier que le devis est en attente
+    if (devis.status !== 'en_attente') {
+      throw new Error('Ce devis ne peut plus être refusé');
+    }
+
+    // Refuser le devis
     await DevisModel.declineDevis(devisId);
-    return { message: 'Devis refuse' };
+    return { message: 'Devis refusé avec succès' };
   }
 
   // Récupérer tous les devis d'un client

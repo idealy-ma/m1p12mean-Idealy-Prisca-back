@@ -195,18 +195,83 @@ finalizeDevis = async (req, res, next) => {
 accepteDevis = async (req, res, next) => {
   try {
     const { devisId } = req.params;
-    const result = await this.service.acceptDevis(devisId);
-    res.status(200).json(result);
+    const clientId = req.user._id;
+
+    // Vérifier que l'utilisateur est un client
+    if (req.user.role !== 'client') {
+      return res.status(403).json({
+        success: false,
+        message: 'Seul un client peut accepter un devis'
+      });
+    }
+
+    const result = await this.service.acceptDevis(devisId, clientId);
+    res.status(200).json({
+      success: true,
+      message: result.message
+    });
   } catch (error) {
+    // Gérer les différents types d'erreurs
+    if (error.message === 'Devis non trouvé') {
+      return res.status(404).json({
+        success: false,
+        message: error.message
+      });
+    }
+    if (error.message.includes('n\'êtes pas autorisé')) {
+      return res.status(403).json({
+        success: false,
+        message: error.message
+      });
+    }
+    if (error.message.includes('ne peut plus être accepté') || 
+        error.message.includes('doit contenir au moins un service')) {
+      return res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
     next(error);
   }
 };
 declineDevis = async (req, res, next) => {
   try {
     const { devisId } = req.params;
-    const result = await this.service.refuserDevis(devisId);
-    res.status(200).json(result);
+    const clientId = req.user._id;
+
+    // Vérifier que l'utilisateur est un client
+    if (req.user.role !== 'client') {
+      return res.status(403).json({
+        success: false,
+        message: 'Seul un client peut refuser un devis'
+      });
+    }
+
+    const result = await this.service.refuserDevis(devisId, clientId);
+    res.status(200).json({
+      success: true,
+      message: result.message
+    });
   } catch (error) {
+    // Gérer les différents types d'erreurs
+    if (error.message === 'Devis non trouvé') {
+      return res.status(404).json({
+        success: false,
+        message: error.message
+      });
+    }
+    if (error.message.includes('n\'êtes pas autorisé')) {
+      return res.status(403).json({
+        success: false,
+        message: error.message
+      });
+    }
+    if (error.message.includes('ne peut plus être refusé')) {
+      return res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
     next(error);
   }
 };
