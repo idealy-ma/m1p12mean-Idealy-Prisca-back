@@ -572,6 +572,51 @@ class UserController extends BaseController {
       });
     }
   };
+
+  /**
+   * Récupère les mécaniciens disponibles pour une date spécifique
+   * Accessible uniquement par les managers
+   * @param {Object} req - La requête Express
+   * @param {Object} res - La réponse Express
+   * @returns {Promise<void>}
+   */
+  getAvailableMechanicsByDate = async (req, res) => {
+    try {
+      const { date } = req.query;
+      
+      // Validation de la date
+      if (!date) {
+        return res.status(400).json({
+          success: false,
+          message: 'La date est requise (format: YYYY-MM-DD)'
+        });
+      }
+      
+      // Validation du format de la date
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(date)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Format de date invalide. Utilisez le format YYYY-MM-DD'
+        });
+      }
+      
+      // Récupérer les mécaniciens disponibles pour la date spécifiée
+      const availableMechanics = await this.service.getAvailableMechanicsByDate(date);
+      
+      res.status(200).json({
+        success: true,
+        date,
+        count: availableMechanics.length,
+        data: availableMechanics
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Erreur lors de la récupération des mécaniciens disponibles'
+      });
+    }
+  };
 }
 
 module.exports = new UserController(); 
