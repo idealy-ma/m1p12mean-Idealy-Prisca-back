@@ -30,6 +30,8 @@ router.delete('/employees/:id', UserController.deleteEmployee);
 router.patch('/employees/:id/role', UserController.changeEmployeeRole);
 // Route pour récupérer la liste des employés (mécaniciens et managers)
 router.get('/employees', UserController.getAllEmployees);
+// Route pour récupérer les mécaniciens disponibles pour une date spécifique
+router.get('/mecaniciens/disponibles', UserController.getAvailableMechanicsByDate);
 
 // Routes de gestion des devis
 router.get('/devis', DevisController.getAllDevis);

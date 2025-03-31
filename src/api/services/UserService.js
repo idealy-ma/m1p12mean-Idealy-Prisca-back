@@ -1,8 +1,10 @@
 const BaseService = require('./BaseService');
 const UserModel = require('../models/User');
+const DevisModel = require('../models/Devis');
 const config = require('../../config');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const mongoose = require('mongoose');
 /**
  * Service pour gérer les utilisateurs
  * Suit le principe d'interface ségrégation (I de SOLID)
@@ -207,6 +209,79 @@ class UserService extends BaseService {
     return await bcrypt.hash(motDePasse, salt);
   };
 
+  /**
+   * Récupère les mécaniciens disponibles pour une date spécifique
+   * @param {string|Date} date - La date pour laquelle vérifier la disponibilité (format YYYY-MM-DD ou objet Date)
+   * @returns {Promise<Array>} Les mécaniciens disponibles
+   */
+  async getAvailableMechanicsByDate(date) {
+    try {
+      // S'assurer que la date est au format YYYY-MM-DD
+      const targetDate = typeof date === 'string' ? date : new Date(date).toISOString().split('T')[0];
+      
+      // Récupérer tous les mécaniciens actifs
+      const allMechanics = await this.repository.model.find({ 
+        role: 'mecanicien',
+        estActif: true
+      });
+
+      // Si aucun mécanicien, retourner un tableau vide
+      if (!allMechanics.length) return [];
+
+      // Récupérer les IDs de tous les mécaniciens
+      const allMechanicsIds = allMechanics.map(mech => mech._id.toString());
+      
+      // Utiliser le modèle Mongoose directement comme dans les autres méthodes
+      const DevisMongooseModel = mongoose.model('Devis');
+      
+      // Récupérer tous les devis avec statut "en_attente" ou "accepte"
+      const activeDevis = await DevisMongooseModel.find({
+        status: { $in: ['en_attente', 'accepte'] }
+      }).populate('mecaniciensTravaillant.mecanicien');
+
+      // Ensemble des IDs de mécaniciens occupés à la date spécifiée
+      const busyMechanicsIds = new Set();
+
+      // Parcourir tous les devis actifs
+      activeDevis.forEach(devis => {
+        devis.mecaniciensTravaillant.forEach(mecanicienData => {
+          const { mecanicien, debut, heureDeTravail } = mecanicienData;
+          // Si le mécanicien a une date de début et des heures de travail
+          if (mecanicien && debut) {
+            const startDate = new Date(debut);
+            // Calculer le nombre de jours de travail nécessaires (8h par jour)
+            const workDays = Math.ceil(heureDeTravail / 8);
+            
+            // Vérifier si la date cible est dans la période de travail
+            for (let i = 0; i < workDays; i++) {
+              const currentDate = new Date(startDate);
+              currentDate.setDate(startDate.getDate() + i);
+              const currentDateStr = currentDate.toISOString().split('T')[0];
+              
+              // Si la date courante correspond à la date cible, marquer le mécanicien comme occupé
+              if (currentDateStr === targetDate) {
+                busyMechanicsIds.add(mecanicien._id.toString());
+                break;
+              }
+            }
+          }
+        });
+      });
+
+      // Filtrer les mécaniciens disponibles (ceux qui ne sont pas occupés)
+      const availableMechanicsIds = allMechanicsIds.filter(id => !busyMechanicsIds.has(id));
+      
+      // Récupérer les objets mécaniciens complets pour les IDs disponibles
+      const availableMechanics = allMechanics.filter(mechanic => 
+        availableMechanicsIds.includes(mechanic._id.toString())
+      );
+
+      return availableMechanics;
+    } catch (error) {
+      console.error('Erreur dans getAvailableMechanicsByDate:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = new UserService(); 
