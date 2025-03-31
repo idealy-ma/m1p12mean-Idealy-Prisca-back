@@ -161,9 +161,119 @@ class DevisService extends BaseService {
   }
 
   // Finaliser le devis (le marquer comme "terminé")
-  async finalizeDevis(devisId) {
+  async finalizeDevis(devisId, updateData = {}) {
+    // Vérifier que le devis existe
+    const devis = await this.repository.model.findById(devisId);
+
+    if (!devis) {
+      throw new Error('Devis non trouvé');
+    }
+
+    // Vérifier que le devis n'est pas déjà refuse
+    if (devis.status === 'refuse') {
+      throw new Error('Ce devis est déjà refusé');
+    }
+
+    // Vérifier que le devis n'est pas déjà accepte
+    if (devis.status === 'accepte') {
+      throw new Error('Ce devis est déjà acceptee');
+    }
+
+    console.log('updateData', updateData);
+
+    // Vérifier la date d'intervention si fournie
+    if (updateData.dateIntervention) {
+      const dateIntervention = new Date(updateData.dateIntervention);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      if (dateIntervention < today) {
+        throw new Error('La date d\'intervention ne peut pas être dans le passé');
+      }
+
+      // Vérifier la disponibilité des mécaniciens à cette date
+      if (updateData.mecaniciens && updateData.mecaniciens.length > 0) {
+        const mecaniciensIds = updateData.mecaniciens.map(m => m.mecanicien);
+        
+        // Récupérer les devis existants pour cette date
+        const devisExistant = await this.repository.model.findOne({
+          _id: { $ne: devisId }, // Exclure le devis actuel
+          status: { $in: ['en_attente', 'accepte'] },
+          dateIntervention: dateIntervention,
+          'mecaniciensTravaillant.mecanicien': { $in: mecaniciensIds }
+        });
+
+        if (devisExistant) {
+          throw new Error('Un ou plusieurs mécaniciens ne sont pas disponibles à cette date');
+        }
+      }
+
+      // Mettre à jour la date d'intervention
+      devis.dateIntervention = dateIntervention;
+    }
+
+    // Mettre à jour les données du devis si fournies
+    if (updateData) {
+      // Synchroniser les services
+      if (updateData.services) {
+        devis.servicesChoisis = updateData.services;
+      }
+
+      // Synchroniser les packs
+      if (updateData.packs) {
+        devis.packsChoisis = updateData.packs;
+      }
+
+      // Synchroniser les lignes supplémentaires
+      if (updateData.lignesSupplementaires) {
+        devis.lignesSupplementaires = updateData.lignesSupplementaires;
+      }
+
+      // Synchroniser les mécaniciens
+      if (updateData.mecaniciens) {
+        devis.mecaniciensTravaillant = updateData.mecaniciens.map(mecanicien => ({
+          ...mecanicien,
+          debut: devis.dateIntervention
+        }));
+      }
+
+      // Sauvegarder les modifications
+      await devis.save();
+    }
+
+    // Vérifier si le devis a au moins un service, un pack ou une ligne supplémentaire
+    if (
+      (devis.servicesChoisis.length === 0) && 
+      (devis.packsChoisis.length === 0) && 
+      (devis.lignesSupplementaires.length === 0)
+    ) {
+      throw new Error('Le devis doit contenir au moins un service, un pack ou une ligne supplémentaire');
+    }
+
+    // Vérifier si au moins un mécanicien est assigné
+    if (devis.mecaniciensTravaillant.length === 0) {
+      throw new Error('Au moins un mécanicien doit être assigné au devis avant finalisation');
+    }
+
+    // Recalculer le total pour s'assurer qu'il est à jour
+    await DevisModel.updateTotal(devisId);
+
+    // Finaliser le devis
     await DevisModel.finalizeDevis(devisId);
-    return { message: 'Devis envoyé avec succès' };
+
+    // Obtenir le devis mis à jour
+    const updatedDevis = await this.repository.model.findById(devisId)
+      .populate('client', 'nom prenom email')
+      .populate('vehicule', 'immatricule marque modele')
+      .populate('servicesChoisis.service')
+      .populate('packsChoisis.servicePack')
+      .populate('mecaniciensTravaillant.mecanicien', 'nom prenom tarifHoraire');
+
+    // Retourner un message de succès avec les détails du devis
+    return { 
+      message: 'Devis finalisé avec succès', 
+      devis: updatedDevis 
+    };
   }
   // accepter le devis
   async acceptDevis(devisId) {
@@ -549,6 +659,57 @@ async listTasksForDevis(devisId) {
   }
 }
 
+// Ajouter un service à un devis existant
+async addService(devisId, serviceData) {
+  // Vérifier que le devis existe
+  const devis = await this.repository.model.findById(devisId);
+  if (!devis) {
+    throw new Error('Devis non trouvé');
+  }
+
+  // Vérifier que le devis n'est pas déjà finalisé
+  if (devis.status === 'termine' || devis.status === 'refuse') {
+    throw new Error('Impossible de modifier un devis déjà finalisé ou refusé');
+  }
+
+  // Ajouter le service au devis
+  devis.servicesChoisis.push(serviceData);
+  
+  // Sauvegarder le devis
+  await devis.save();
+  
+  // Recalculer le total
+  await DevisModel.updateTotal(devisId);
+  
+  // Retourner le devis mis à jour
+  return devis;
+}
+
+// Ajouter un pack de services à un devis existant
+async addServicePack(devisId, packData) {
+  // Vérifier que le devis existe
+  const devis = await this.repository.model.findById(devisId);
+  if (!devis) {
+    throw new Error('Devis non trouvé');
+  }
+
+  // Vérifier que le devis n'est pas déjà finalisé
+  if (devis.status === 'termine' || devis.status === 'refuse') {
+    throw new Error('Impossible de modifier un devis déjà finalisé ou refusé');
+  }
+
+  // Ajouter le pack au devis
+  devis.packsChoisis.push(packData);
+  
+  // Sauvegarder le devis
+  await devis.save();
+  
+  // Recalculer le total
+  await DevisModel.updateTotal(devisId);
+  
+  // Retourner le devis mis à jour
+  return devis;
+}
 
 }
 

@@ -36,6 +36,7 @@ router.get('/mecaniciens/disponibles', UserController.getAvailableMechanicsByDat
 // Routes de gestion des devis
 router.get('/devis', DevisController.getAllDevis);
 router.get('/devis/:id', DevisController.getDevisById);
+// Finaliser un devis et ajouter des services, packs, lignes supplémentaires et mécaniciens en une seule opération
 router.post('/devis/:devisId/finaliser', DevisController.finalizeDevis);
 // Ajouter une ligne supplémentaire à un devis
 router.post('/devis/:devisId/ligne-supplementaire', DevisController.addLigneSupplementaire);
