@@ -2,6 +2,7 @@ const BaseService = require('./BaseService');
 const DevisModel = require('../models/Devis');
 const UserModel = require('../models/User');
 const mongoose = require('mongoose');
+const Reparation = require('../models/Reparation');
 
 /**
  * Service pour gérer les devis
@@ -277,8 +278,13 @@ class DevisService extends BaseService {
   }
   // accepter le devis
   async acceptDevis(devisId, clientId) {
-    // Vérifier que le devis existe
-    const devis = await this.repository.model.findById(devisId);
+    // Vérifier que le devis existe et récupérer ses détails pour la copie
+    // Populate les champs nécessaires pour la création de la réparation
+    const devis = await this.repository.model.findById(devisId)
+        .populate('servicesChoisis.service')
+        .populate('packsChoisis.servicePack')
+        .populate('mecaniciensTravaillant.mecanicien', '_id'); // Seulement l'ID pour la référence
+
     if (!devis) {
       throw new Error('Devis non trouvé');
     }
@@ -288,19 +294,56 @@ class DevisService extends BaseService {
       throw new Error('Vous n\'êtes pas autorisé à accepter ce devis');
     }
 
-    // Vérifier que le devis est en attente ou terminé
+    // Vérifier que le devis est en attente ou terminé (préparé par manager)
+    // Le statut 'termine' ici signifie 'finalisé' par le manager, pas 'travaux finis'
     if (devis.status !== 'en_attente' && devis.status !== 'termine') {
-      throw new Error('Ce devis ne peut plus être accepté');
+        throw new Error('Ce devis ne peut plus être accepté (statut actuel: ' + devis.status + ')');
     }
 
-    // Vérifier que le devis a au moins un service ou un pack
+    // Vérifier que le devis a au moins un service ou un pack ou une ligne supplémentaire
     if (devis.servicesChoisis.length === 0 && devis.packsChoisis.length === 0 && devis.lignesSupplementaires.length === 0) {
-      throw new Error('Le devis doit contenir au moins un service ou un pack ou une ligne supplémentaire');
+      throw new Error('Le devis doit contenir au moins un service, un pack ou une ligne supplémentaire pour être accepté');
     }
 
-    // Accepter le devis
-    await DevisModel.acceptDevis(devisId);
-    return { message: 'Devis accepté avec succès' };
+    const existingReparation = await Reparation.findOne({ devisOrigine: devisId });
+    if (existingReparation) {
+        if (devis.status !== 'accepte') {
+            await this.repository.acceptDevis(devisId);
+        }
+        return {
+            message: 'Devis déjà accepté. Réparation déjà existante.',
+            reparationId: existingReparation._id // Retourner l'ID existant
+        };
+    }
+
+    await this.repository.acceptDevis(devisId);
+
+    const reparationData = {
+        devisOrigine: devis._id,
+        client: devis.client,
+        vehicule: devis.vehicule,
+        mecanicienAssigné: devis.mecaniciensTravaillant.length > 0 ? devis.mecaniciensTravaillant[0].mecanicien._id : null, // Prend le premier mécanicien assigné au devis, s'il y en a un
+          statusReparation: 'Planifiée',
+        servicesInclus: devis.servicesChoisis.map(s => ({ service: s.service._id, prix: s.prix, note: s.note })), 
+        packsInclus: devis.packsChoisis.map(p => ({ servicePack: p.servicePack._id, prix: p.prix, note: p.note })), 
+        lignesSupplementairesIncluses: devis.lignesSupplementaires.map(l => ({ nom: l.nom, prix: l.prix, quantite: l.quantite, type: l.type, note: l.note })), 
+        problemeDeclare: devis.probleme,
+        etapesSuivi: [],
+        photos: [],
+        notesInternes: [],
+        dateDebutPrevue: devis.preferredDate,
+        coutEstime: devis.total, 
+    };
+
+    const nouvelleReparation = new Reparation(reparationData);
+    await nouvelleReparation.save();
+
+    console.log(`Réparation ${nouvelleReparation._id} créée pour le devis ${devisId}`);
+
+    return {
+        message: 'Devis accepté avec succès et réparation planifiée.',
+        reparationId: nouvelleReparation._id
+    };
   }
   // refuser le devis
   async refuserDevis(devisId, clientId) {
