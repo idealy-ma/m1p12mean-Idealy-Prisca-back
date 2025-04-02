@@ -278,8 +278,6 @@ class DevisService extends BaseService {
   }
   // accepter le devis
   async acceptDevis(devisId, clientId) {
-    // Vérifier que le devis existe et récupérer ses détails pour la copie
-    // Populate les champs nécessaires pour la création de la réparation
     const devis = await this.repository.model.findById(devisId)
         .populate('servicesChoisis.service')
         .populate('packsChoisis.servicePack')
@@ -288,19 +286,14 @@ class DevisService extends BaseService {
     if (!devis) {
       throw new Error('Devis non trouvé');
     }
-
-    // Vérifier que le client est bien le propriétaire du devis
     if (devis.client.toString() !== clientId.toString()) {
       throw new Error('Vous n\'êtes pas autorisé à accepter ce devis');
     }
 
-    // Vérifier que le devis est en attente ou terminé (préparé par manager)
-    // Le statut 'termine' ici signifie 'finalisé' par le manager, pas 'travaux finis'
     if (devis.status !== 'en_attente' && devis.status !== 'termine') {
         throw new Error('Ce devis ne peut plus être accepté (statut actuel: ' + devis.status + ')');
     }
 
-    // Vérifier que le devis a au moins un service ou un pack ou une ligne supplémentaire
     if (devis.servicesChoisis.length === 0 && devis.packsChoisis.length === 0 && devis.lignesSupplementaires.length === 0) {
       throw new Error('Le devis doit contenir au moins un service, un pack ou une ligne supplémentaire pour être accepté');
     }
@@ -316,29 +309,78 @@ class DevisService extends BaseService {
         };
     }
 
-    await this.repository.acceptDevis(devisId);
+    // Générer les étapes initiales à partir des services, packs et lignes supplémentaires
+    let initialEtapes = [];
+
+    // Ajouter les étapes depuis servicesChoisis
+    if (Array.isArray(devis.servicesChoisis)) {
+        devis.servicesChoisis
+            .filter(s => s && s.service && s.service.nom) // Assurer que le service et son nom sont présents
+            .forEach(s => {
+                initialEtapes.push({
+                    titre: s.service.nom, // Utiliser le nom du service populé
+                    description: s.note || `Réaliser le service: ${s.service.nom}`,
+                    status: 'En attente' // Statut initial pour une étape
+                });
+            });
+    }
+
+    // Ajouter les étapes depuis packsChoisis
+    if (Array.isArray(devis.packsChoisis)) {
+        devis.packsChoisis
+            .filter(p => p && p.servicePack && p.servicePack.nom) // Assurer que le pack et son nom sont présents
+            .forEach(p => {
+                initialEtapes.push({
+                    titre: p.servicePack.nom,
+                    description: p.note || `Réaliser le pack: ${p.servicePack.nom}`,
+                    status: 'En attente'
+                });
+            });
+    }
+
+    // Traiter les lignes supplémentaires, en gérant le cas où elles sont stockées comme une chaîne JSON dans la BDD
+    let processedLignesSupplementaires = [];
+    if (Array.isArray(devis.lignesSupplementaires)) {
+        // Si c'est déjà un tableau (cas normal), on le prend tel quel
+        processedLignesSupplementaires = devis.lignesSupplementaires;
+    }
+
+    // Ajouter les étapes depuis le tableau traité lignesSupplementaires
+    processedLignesSupplementaires
+        .filter(l => l && typeof l.nom === 'string' && l.nom.trim() !== '') // Assurer que la ligne a un nom
+        .forEach(l => {
+            initialEtapes.push({
+                titre: l.nom,
+                description: l.note || 'Effectuer: ' + l.nom,
+                status: 'En attente'
+            });
+        });
 
     const reparationData = {
         devisOrigine: devis._id,
         client: devis.client,
         vehicule: devis.vehicule,
-        mecanicienAssigné: devis.mecaniciensTravaillant.length > 0 ? devis.mecaniciensTravaillant[0].mecanicien._id : null, // Prend le premier mécanicien assigné au devis, s'il y en a un
-          statusReparation: 'Planifiée',
-        servicesInclus: devis.servicesChoisis.map(s => ({ service: s.service._id, prix: s.prix, note: s.note })), 
-        packsInclus: devis.packsChoisis.map(p => ({ servicePack: p.servicePack._id, prix: p.prix, note: p.note })), 
-        lignesSupplementairesIncluses: devis.lignesSupplementaires.map(l => ({ nom: l.nom, prix: l.prix, quantite: l.quantite, type: l.type, note: l.note })), 
+        mecaniciensAssignes: devis.mecaniciensTravaillant
+            .filter(mt => mt && mt.mecanicien && mt.mecanicien._id)
+            .map(mt => ({ mecanicien: mt.mecanicien._id })),
+        statusReparation: 'Planifiée', // Statut initial
+        servicesInclus: devis.servicesChoisis.map(s => ({ service: s.service._id, prix: s.prix, note: s.note })),
+        packsInclus: devis.packsChoisis.map(p => ({ servicePack: p.servicePack._id, prix: p.prix, note: p.note })),
         problemeDeclare: devis.probleme,
-        etapesSuivi: [],
-        photos: [],
+        etapesSuivi: initialEtapes, // Utiliser les étapes générées
+        photos: [], // Initialement vide
         notesInternes: [],
-        dateDebutPrevue: devis.preferredDate,
-        coutEstime: devis.total, 
+        dateDebutPrevue: devis.preferredDate, // Utiliser la date préférée du devis comme date prévue ?
+        // dateFinPrevue:  // A calculer ou définir plus tard
+        coutEstime: devis.total,
     };
 
+    // 4. Créer et sauvegarder la nouvelle réparation
     const nouvelleReparation = new Reparation(reparationData);
     await nouvelleReparation.save();
 
-    console.log(`Réparation ${nouvelleReparation._id} créée pour le devis ${devisId}`);
+    await this.repository.acceptDevis(devisId);
+
 
     return {
         message: 'Devis accepté avec succès et réparation planifiée.',

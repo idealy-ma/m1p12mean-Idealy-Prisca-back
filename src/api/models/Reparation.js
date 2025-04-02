@@ -53,24 +53,15 @@ const reparationSchema = new mongoose.Schema({
     ref: 'Vehicule',
     required: true
   },
-  mecanicienAssigné: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    // required: false, // Peut être assigné plus tard
-    validate: { // Optionnel: S'assurer que l'utilisateur assigné a le rôle mécanicien
-        validator: async function(userId) {
-            if (!userId) return true; // Permettre null/undefined si non requis
-            try {
-                const user = await mongoose.model('User').findById(userId); // Utiliser mongoose.model('User') pour éviter les problèmes d'ordre d'import
-                return user && user.role === 'mecanicien';
-            } catch (error) {
-                console.error("Erreur lors de la validation du rôle mécanicien:", error);
-                return false; // En cas d'erreur, considérer la validation comme échouée
-            }
-        },
-        message: `L'utilisateur assigné doit être un mécanicien.`
+  mecaniciensAssignes: [{
+    _id: false,
+    mecanicien: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
     }
-  },
+    // Ajouter d'autres champs par assignation si besoin
+  }],
   statusReparation: {
     type: String,
     enum: ['Planifiée', 'En cours', 'En attente pièces', 'Terminée', 'Facturée', 'Annulée'],
@@ -87,15 +78,6 @@ const reparationSchema = new mongoose.Schema({
   packsInclus: [{
     servicePack: { type: mongoose.Schema.Types.ObjectId, ref: 'ServicePack' },
     prix: Number,
-    note: String
-     // On pourrait ajouter un statut spécifique à la tâche ici si besoin: statusTache: String
-  }],
-  lignesSupplementairesIncluses: [{
-    _id: false, // Pas besoin d'ID pour ces lignes copiées
-    nom: String,
-    prix: Number,
-    quantite: Number,
-    type: String,
     note: String
      // On pourrait ajouter un statut spécifique à la tâche ici si besoin: statusTache: String
   }],
@@ -120,7 +102,8 @@ const reparationSchema = new mongoose.Schema({
 
 // Index pour améliorer les recherches courantes
 reparationSchema.index({ client: 1, statusReparation: 1 });
-reparationSchema.index({ mecanicienAssigné: 1, statusReparation: 1 });
+// Index modifié pour le tableau
+reparationSchema.index({ 'mecaniciensAssignes.mecanicien': 1, statusReparation: 1 });
 reparationSchema.index({ statusReparation: 1 });
 
 // Pré-hook pour s'assurer que le client et le mécanicien (si assigné) existent et ont le bon rôle
@@ -132,12 +115,14 @@ reparationSchema.pre('save', async function(next) {
       throw new Error(`L'ID client fourni ne correspond pas à un utilisateur avec le rôle client.`);
     }
 
-    // Vérifier le mécanicien si assigné
-    if (this.mecanicienAssigné) {
-       const mecanicienUser = await mongoose.model('User').findById(this.mecanicienAssigné);
-       if (!mecanicienUser || mecanicienUser.role !== 'mecanicien') {
-         throw new Error(`L'ID mécanicien fourni ne correspond pas à un utilisateur avec le rôle mécanicien.`);
-       }
+    // Vérifier les mécaniciens assignés (si présents)
+    if (this.mecaniciensAssignes && this.mecaniciensAssignes.length > 0) {
+      for (const assignation of this.mecaniciensAssignes) {
+          const mecanicienUser = await mongoose.model('User').findById(assignation.mecanicien);
+          if (!mecanicienUser || mecanicienUser.role !== 'mecanicien') {
+            throw new Error(`L'ID mécanicien ${assignation.mecanicien} ne correspond pas à un utilisateur avec le rôle mécanicien.`);
+          }
+      }
     }
 
     // Vérifier le véhicule
@@ -145,9 +130,6 @@ reparationSchema.pre('save', async function(next) {
         const vehiculeExists = await mongoose.model('Vehicule').findById(this.vehicule);
         if (!vehiculeExists) {
             throw new Error(`L'ID véhicule fourni n'existe pas.`);
-        }
-        if (vehiculeExists.proprietaire.toString() !== this.client.toString()) {
-            throw new Error(`Le véhicule spécifié n'appartient pas au client spécifié.`);
         }
     }
 
