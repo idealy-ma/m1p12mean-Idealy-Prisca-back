@@ -47,12 +47,15 @@ class BaseService {
   /**
    * Récupère toutes les entités
    * @param {Object} filter - Filtre pour la recherche
-   * @param {Object} options - Options pour la recherche
+   * @param {Object} sort - Options de tri
+   * @param {number} skip - Nombre d'éléments à sauter
+   * @param {number} limit - Nombre d'éléments à retourner
+   * @param {Object|String} select - Champs à sélectionner
    * @returns {Promise<Array>} Les entités trouvées
    */
-  async getAll(filter = {}, options = {}) {
+  async getAll(filter = {}, sort = null, skip = 0, limit = 0, select = null) {
     try {
-      return await this.repository.find(filter, options);
+      return await this.repository.find(filter, sort, skip, limit, select);
     } catch (error) {
       throw error;
     }

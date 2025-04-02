@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const BaseModel = require('./BaseModel'); // Importer BaseModel
 const User = require('./User'); // Pour vérifier les rôles si besoin plus tard
 // const Devis = require('./Devis'); // Décommenter si besoin de méthodes spécifiques de Devis ici, sinon la ref suffit
 const Vehicule = require('./Vehicule'); // Ajout de l'import pour la référence Véhicule
@@ -139,5 +140,19 @@ reparationSchema.pre('save', async function(next) {
   }
 });
 
+// Créer le modèle Mongoose
+const ReparationModel = mongoose.model('Reparation', reparationSchema);
 
-module.exports = mongoose.model('Reparation', reparationSchema); 
+// Définir la classe Reparation qui étend BaseModel
+class Reparation extends BaseModel {
+  constructor() {
+    super(ReparationModel);
+  }
+
+  // Ajouter ici des méthodes spécifiques au modèle Reparation si nécessaire
+  // Par exemple: 
+  // async findByStatus(status) { ... }
+}
+
+// Exporter une instance de la classe Reparation
+module.exports = new Reparation(); 
