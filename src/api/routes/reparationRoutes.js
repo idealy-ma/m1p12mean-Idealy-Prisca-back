@@ -20,4 +20,11 @@ router.patch(
   ReparationController.updateEtapeStatus
 );
 
+// Route pour ajouter un commentaire à une étape spécifique
+router.post(
+  '/:reparationId/etapes/:etapeId/commentaires',
+  authorize('client', 'mecanicien'), // Autoriser SEULEMENT client et mecanicien
+  ReparationController.addCommentToEtape
+);
+
 module.exports = router; 

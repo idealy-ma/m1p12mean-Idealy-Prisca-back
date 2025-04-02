@@ -253,6 +253,96 @@ class ReparationController {
     }
   }
 
+  /**
+   * Ajoute un commentaire à une étape spécifique d'une réparation.
+   * @param {Object} req - Requête Express
+   * @param {Object} res - Réponse Express
+   * @param {Object} next - Fonction next d'Express
+   */
+  addCommentToEtape = async (req, res, next) => {
+    try {
+      const { reparationId, etapeId } = req.params;
+      const { message } = req.body; // Message du commentaire
+      const userId = req.user._id;
+      const userRole = req.user.role;
+
+      // Validation
+      if (!mongoose.Types.ObjectId.isValid(reparationId) || !mongoose.Types.ObjectId.isValid(etapeId)) {
+        return res.status(400).json({ success: false, message: 'ID de réparation ou d\'étape invalide.', error: 'INVALID_ID' });
+      }
+      if (!message || typeof message !== 'string' || message.trim().length === 0) {
+        return res.status(400).json({ success: false, message: 'Le message du commentaire ne peut pas être vide.', error: 'INVALID_MESSAGE' });
+      }
+
+      // Récupérer la réparation
+      const reparation = await ReparationService.repository.model.findById(reparationId);
+      if (!reparation) {
+        return res.status(404).json({ success: false, message: 'Réparation non trouvée.', error: 'NOT_FOUND' });
+      }
+
+      // Vérification des droits d'accès (Mécanicien assigné ou Client propriétaire)
+      let canAccess = false;
+      if (userRole === 'mecanicien' && reparation.mecaniciensAssignes?.some(a => a.mecanicien?.equals(userId))) {
+        canAccess = true;
+      } else if (userRole === 'client' && reparation.client?.equals(userId)) {
+        canAccess = true;
+      }
+
+      if (!canAccess) {
+        return res.status(403).json({ success: false, message: 'Accès non autorisé à commenter cette étape.', error: 'FORBIDDEN' });
+      }
+
+      // Trouver l'index de l'étape
+      const etapeIndex = reparation.etapesSuivi.findIndex(etape => etape._id.equals(etapeId));
+      if (etapeIndex === -1) {
+        return res.status(404).json({ success: false, message: 'Étape non trouvée dans cette réparation.', error: 'STEP_NOT_FOUND' });
+      }
+
+      // Créer le nouveau commentaire
+      const nouveauCommentaire = {
+        auteur: userId, // Stocker l'ID de l'auteur
+        message: message.trim(),
+        date: new Date() // La date est gérée par défaut, mais on peut la forcer ici
+      };
+
+      // Ajouter le commentaire au tableau des commentaires de l'étape
+      reparation.etapesSuivi[etapeIndex].commentaires.push(nouveauCommentaire);
+      
+      // Marquer le chemin comme modifié pour Mongoose
+      reparation.markModified('etapesSuivi');
+
+      // Sauvegarder la réparation
+      const reparationMiseAJour = await reparation.save();
+
+      // Récupérer l'étape mise à jour
+      const etapeMiseAJour = reparationMiseAJour.etapesSuivi[etapeIndex];
+      
+      // Populer l'auteur du dernier commentaire ajouté avant de renvoyer
+      // Utiliser .populate() sur le sous-document peut être un peu différent
+      // Assurons-nous que l'auteur est bien populé sur l'étape entière récupérée
+      await reparationMiseAJour.populate({
+          path: 'etapesSuivi.commentaires.auteur',
+          select: 'nom prenom role' // Sélectionner les champs nécessaires
+      });
+      // Récupérer à nouveau l'étape après population générale
+      const etapePopulee = reparationMiseAJour.etapesSuivi.find(e => e._id.equals(etapeId)); 
+
+      res.status(201).json({
+        success: true,
+        message: 'Commentaire ajouté avec succès.',
+        data: etapePopulee // Renvoyer l'étape complète avec l'auteur du nouveau commentaire populé
+      });
+
+    } catch (error) {
+      console.error("Erreur dans addCommentToEtape:", error);
+      // Gérer les erreurs de validation Mongoose spécifiques si nécessaire
+      if (error.name === 'ValidationError') {
+        return res.status(400).json({ success: false, message: error.message, error: 'VALIDATION_ERROR', details: error.errors });
+      }
+      next(error);
+    }
+  }
+
 }
 
 module.exports = new ReparationController(); 

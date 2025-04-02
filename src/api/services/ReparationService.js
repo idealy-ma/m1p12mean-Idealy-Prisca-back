@@ -45,9 +45,13 @@ class ReparationService extends BaseService {
     try {
       let query = this.repository.model.find(filter);
 
-      // Populate les champs nécessaires pour l'affichage frontend
+      // Populate les champs nécessaires
       query = query.populate('vehicule', 'marque modele immatriculation')
-                   .populate('client', 'nom prenom telephone');
+                   .populate('client', 'nom prenom telephone')
+                   .populate({ 
+                       path: 'etapesSuivi.commentaires.auteur', 
+                       select: 'nom prenom role' 
+                   });
 
       // Applique les options de tri, skip et limit
       if (sort) {
