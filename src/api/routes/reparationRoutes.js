@@ -27,4 +27,11 @@ router.post(
   ReparationController.addCommentToEtape
 );
 
+// Route pour ajouter une photo à une réparation
+router.post(
+  '/:reparationId/photos',
+  authorize('mecanicien', 'manager'), // Seuls mécanicien (assigné) et manager peuvent ajouter
+  ReparationController.addPhotoToReparation // Nouvelle méthode contrôleur
+);
+
 module.exports = router; 

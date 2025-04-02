@@ -343,6 +343,96 @@ class ReparationController {
     }
   }
 
+  /**
+   * Ajoute une photo (URL) à une réparation.
+   * @param {Object} req - Requête Express
+   * @param {Object} res - Réponse Express
+   * @param {Object} next - Fonction next d'Express
+   */
+  addPhotoToReparation = async (req, res, next) => {
+    try {
+      const { reparationId } = req.params;
+      const { url, description, etapeAssociee } = req.body; // URL Supabase et métadonnées
+      const userId = req.user._id;
+      const userRole = req.user.role;
+
+      // Validation
+      if (!mongoose.Types.ObjectId.isValid(reparationId)) {
+        return res.status(400).json({ success: false, message: 'ID de réparation invalide.', error: 'INVALID_ID' });
+      }
+      if (!url || typeof url !== 'string' || url.trim().length === 0) {
+        return res.status(400).json({ success: false, message: 'L\'URL de la photo est requise.', error: 'INVALID_URL' });
+      }
+       if (!description || typeof description !== 'string' || description.trim().length === 0) {
+        return res.status(400).json({ success: false, message: 'La description de la photo est requise.', error: 'INVALID_DESCRIPTION' });
+      }
+      if (etapeAssociee && !mongoose.Types.ObjectId.isValid(etapeAssociee)) {
+         return res.status(400).json({ success: false, message: 'ID d\'étape associée invalide.', error: 'INVALID_STEP_ID' });
+      }
+
+      // Récupérer la réparation
+      const reparation = await ReparationService.repository.model.findById(reparationId);
+      if (!reparation) {
+        return res.status(404).json({ success: false, message: 'Réparation non trouvée.', error: 'NOT_FOUND' });
+      }
+
+      // Vérification des droits d'accès (Manager ou Mécanicien assigné)
+      let canAccess = false;
+      if (userRole === 'manager') {
+        canAccess = true;
+      } else if (userRole === 'mecanicien' && reparation.mecaniciensAssignes?.some(a => a.mecanicien?.equals(userId))) {
+        canAccess = true;
+      }
+
+      if (!canAccess) {
+        return res.status(403).json({ success: false, message: 'Accès non autorisé à ajouter une photo à cette réparation.', error: 'FORBIDDEN' });
+      }
+
+      // Vérifier que l'étape associée existe (si fournie)
+      if (etapeAssociee && !reparation.etapesSuivi.some(e => e._id.equals(etapeAssociee))) {
+           return res.status(404).json({ success: false, message: 'Étape associée non trouvée dans cette réparation.', error: 'STEP_NOT_FOUND' });
+      }
+
+      // Créer le nouvel objet photo
+      const nouvellePhoto = {
+        url: url,
+        description: description.trim(),
+        ajoutePar: userId,
+        dateAjout: new Date()
+      };
+      if (etapeAssociee) {
+        nouvellePhoto.etapeAssociee = etapeAssociee;
+      }
+
+      // Ajouter la photo au tableau
+      reparation.photos.push(nouvellePhoto);
+      
+      // Marquer le chemin comme modifié (important pour les tableaux)
+      // Bien que push le fasse implicitement, c'est une bonne pratique de l'ajouter
+      reparation.markModified('photos'); 
+
+      // Sauvegarder la réparation
+      const reparationMiseAJour = await reparation.save();
+      
+      // Renvoyer la photo juste ajoutée
+      // Trouver la photo ajoutée (la dernière du tableau)
+      const photoAjoutee = reparationMiseAJour.photos[reparationMiseAJour.photos.length - 1];
+
+      res.status(201).json({
+        success: true,
+        message: 'Photo ajoutée avec succès.',
+        data: photoAjoutee // Renvoyer l'objet photo ajouté
+      });
+
+    } catch (error) {
+      console.error("Erreur dans addPhotoToReparation:", error);
+      if (error.name === 'ValidationError') {
+        return res.status(400).json({ success: false, message: error.message, error: 'VALIDATION_ERROR', details: error.errors });
+      }
+      next(error);
+    }
+  }
+
 }
 
 module.exports = new ReparationController(); 
