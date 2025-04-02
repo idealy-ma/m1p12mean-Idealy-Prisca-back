@@ -172,6 +172,87 @@ class ReparationController {
     }
   }
 
+  /**
+   * Met à jour le statut d'une étape spécifique d'une réparation.
+   * @param {Object} req - Requête Express
+   * @param {Object} res - Réponse Express
+   * @param {Object} next - Fonction next d'Express
+   */
+  updateEtapeStatus = async (req, res, next) => {
+    try {
+      const { reparationId, etapeId } = req.params;
+      const { status, dateFin } = req.body; // Nouveau statut et date de fin optionnelle
+      const userId = req.user._id;
+      const userRole = req.user.role;
+
+      // Validation simple des IDs
+      if (!mongoose.Types.ObjectId.isValid(reparationId) || !mongoose.Types.ObjectId.isValid(etapeId)) {
+        return res.status(400).json({ success: false, message: 'ID de réparation ou d\'étape invalide.', error: 'INVALID_ID' });
+      }
+
+      // Valider que le statut reçu est une valeur valide de l'enum EtapeStatus
+      // Utiliser les valeurs exactes définies dans le schéma Mongoose
+      const validStatuses = ['En attente', 'En cours', 'Terminée', 'Bloquée']; // Utiliser la liste codée en dur
+      if (!status || !validStatuses.includes(status)) {
+         return res.status(400).json({ success: false, message: `Statut '${status}' fourni invalide. Les statuts valides sont: ${validStatuses.join(', ')}.`, error: 'INVALID_STATUS' });
+      }
+
+      // Récupérer la réparation complète (sans utiliser getReparationByIdAvecDetails car on va la modifier)
+      const reparation = await ReparationService.repository.model.findById(reparationId);
+
+      if (!reparation) {
+        return res.status(404).json({ success: false, message: 'Réparation non trouvée.', error: 'NOT_FOUND' });
+      }
+
+      // Vérification des droits d'accès (Manager ou Mécanicien assigné)
+      let canAccess = false;
+      if (userRole === 'manager') {
+        canAccess = true;
+      } else if (userRole === 'mecanicien' && reparation.mecaniciensAssignes?.some(a => a.mecanicien?.equals(userId))) {
+        // Utiliser .equals() pour comparer les ObjectIds Mongoose
+        canAccess = true;
+      }
+
+      if (!canAccess) {
+        return res.status(403).json({ success: false, message: 'Accès non autorisé à modifier cette étape.', error: 'FORBIDDEN' });
+      }
+
+      // Trouver l'étape dans le tableau
+      const etapeIndex = reparation.etapesSuivi.findIndex(etape => etape._id.equals(etapeId));
+
+      if (etapeIndex === -1) {
+        return res.status(404).json({ success: false, message: 'Étape non trouvée dans cette réparation.', error: 'STEP_NOT_FOUND' });
+      }
+
+      // Mettre à jour le statut de l'étape
+      reparation.etapesSuivi[etapeIndex].status = status;
+      // Mettre à jour la date de fin si fournie et si le statut est 'terminee' ou 'annulee'
+      if ((status === 'terminee' || status === 'annulee') && dateFin) {
+          reparation.etapesSuivi[etapeIndex].dateFin = new Date(dateFin);
+      } else if (status === 'en_cours' || status === 'en_attente') {
+          // Optionnel: Effacer la date de fin si on revient à un statut non terminé
+          reparation.etapesSuivi[etapeIndex].dateFin = undefined;
+      }
+      
+      // Marquer le tableau comme modifié pour Mongoose
+      reparation.markModified('etapesSuivi');
+
+      // Sauvegarder la réparation
+      const reparationMiseAJour = await reparation.save();
+
+      // Renvoyer l'étape mise à jour
+      res.status(200).json({
+        success: true,
+        message: 'Statut de l\'étape mis à jour.',
+        data: reparationMiseAJour.etapesSuivi[etapeIndex] // Renvoyer juste l'étape modifiée
+      });
+
+    } catch (error) {
+      console.error("Erreur dans updateEtapeStatus:", error);
+      next(error);
+    }
+  }
+
 }
 
 module.exports = new ReparationController(); 
