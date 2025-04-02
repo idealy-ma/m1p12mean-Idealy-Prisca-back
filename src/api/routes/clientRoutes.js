@@ -6,6 +6,7 @@ const router = express.Router();
 const DevisController = require('../controllers/DevisController');
 const ServiceController = require('../controllers/ServiceController');
 const ServicePackController = require('../controllers/ServicePackController');
+const ClientController = require('../controllers/ClientController');
 // Toutes ces routes nécessitent d'être authentifié en tant que client
 router.use(protect);
 router.use(authorize('client'));
@@ -26,6 +27,9 @@ router.get('/dates-indisponibles', DevisController.getUnavailableDates);
 router.post('/devis/:devisId/accept', DevisController.accepteDevis);
 router.post('/devis/:devisId/decline', DevisController.declineDevis);
 router.get('/devis/:devisId/tasks', DevisController.getTasksForDevis);
+
+// Routes Réparations
+router.get('/reparations', ClientController.getClientReparations);
 
 router.get('/services', ServiceController.getAllServices);
 router.get('/servicePacks', ServicePackController.getAllServicesPack);
