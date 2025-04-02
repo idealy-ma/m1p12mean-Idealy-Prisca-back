@@ -16,24 +16,25 @@ class ReparationController {
   getReparationById = async (req, res, next) => {
     try {
       const reparationId = req.params.id;
-      const userId = req.user._id; // ID de l'utilisateur connecté
-      const userRole = req.user.role; // Rôle de l'utilisateur connecté
+      const userId = req.user._id;
+      const userRole = req.user.role;
 
       if (!mongoose.Types.ObjectId.isValid(reparationId)) {
-           return res.status(400).json({ success: false, message: 'ID de réparation invalide.' });
+        return res.status(400).json({ 
+          success: false, 
+          message: 'ID de réparation invalide.',
+          error: 'INVALID_ID'
+        });
       }
 
-      // Récupérer la réparation en populant les champs utiles
-      // Note: findById est fourni par BaseService via ReparationService
-      const reparation = await ReparationService.findById(reparationId)
-          .populate('client', 'nom prenom email') // Infos client
-          .populate('vehicule', 'marque modele immatriculation') // Infos véhicule
-          .populate('mecaniciensAssignes.mecanicien', 'nom prenom') // Infos mécanicien(s)
-          .populate('devisOrigine', 'status total') // Ex: juste statut et total du devis
-          .populate('etapesSuivi.commentaires.auteur', 'nom prenom role'); // Qui a commenté
+      const reparation = await ReparationService.getReparationByIdAvecDetails(reparationId);
 
       if (!reparation) {
-        return res.status(404).json({ success: false, message: 'Réparation non trouvée.' });
+        return res.status(404).json({ 
+          success: false, 
+          message: 'Réparation non trouvée.',
+          error: 'NOT_FOUND'
+        });
       }
 
       // Vérification des droits d'accès
@@ -41,18 +42,19 @@ class ReparationController {
       if (userRole === 'manager') {
         canAccess = true;
       } else if (userRole === 'client' && reparation.client?._id.equals(userId)) {
-        // Utilisation de optional chaining (?) au cas où la population échoue
         canAccess = true;
       } else if (userRole === 'mecanicien' && reparation.mecaniciensAssignes?.some(a => a.mecanicien?._id.equals(userId))) {
-        // Vérifie si l'ID de l'utilisateur connecté se trouve dans le tableau des mécaniciens assignés
         canAccess = true;
       }
 
       if (!canAccess) {
-        return res.status(403).json({ success: false, message: 'Accès non autorisé à cette réparation.' });
+        return res.status(403).json({ 
+          success: false, 
+          message: 'Accès non autorisé à cette réparation.',
+          error: 'FORBIDDEN'
+        });
       }
 
-      // Si accès autorisé, renvoyer les données
       res.status(200).json({
         success: true,
         data: reparation
@@ -60,7 +62,7 @@ class ReparationController {
 
     } catch (error) {
       console.error("Erreur dans getReparationById:", error);
-      next(error); // Passer l'erreur au gestionnaire d'erreurs global
+      next(error);
     }
   }
 
