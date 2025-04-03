@@ -33,7 +33,8 @@ class ServicePackService extends BaseService {
     return newPack;
   }
   async getAllServicesPack() {
-    return await this.repository.model.find();
+    return await this.repository.model.find().populate('services');
   }
+  
 }
 module.exports = new ServicePackService(); 

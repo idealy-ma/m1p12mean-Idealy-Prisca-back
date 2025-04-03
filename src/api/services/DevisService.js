@@ -129,12 +129,23 @@ class DevisService extends BaseService {
 
       // Récupérer le devis avec les relations peuplées
       const devis = await this.repository.model.findById(id)
-        .populate('client', 'nom prenom email')
-        .populate('vehicule', 'immatricule marque modele')
-        .populate('reponduPar', 'nom prenom')
-        .populate('servicesChoisis.service').populate('packsChoisis.servicePack')
-        .populate('mecaniciensTravaillant.mecanicien', 'nom prenom tarifHoraire');
-
+      .populate('client', 'nom prenom email')
+      .populate('vehicule', 'immatricule marque modele')
+      .populate('reponduPar', 'nom prenom')
+      .populate({
+        path: 'servicesChoisis.service', // Populate service dans servicesChoisis
+        select: 'nom prix description'
+      })
+      .populate({
+        path: 'packsChoisis.servicePack', // Populate servicePack dans packsChoisis
+        select: 'nom description prix services', 
+        populate: { 
+          path: 'services', // Populate les services inclus dans le pack
+          select: 'nom prix'
+        }
+      })
+      .populate('mecaniciensTravaillant.mecanicien', 'nom prenom tarifHoraire');
+    
       // Vérifier si le devis existe
       if (!devis) {
         throw new Error('Devis non trouvé');
@@ -153,7 +164,7 @@ class DevisService extends BaseService {
   }
   // Ajouter une ligne supplémentaire au devis
   async addLigneSupplementaire(devisId, ligne) {
-    const devis = await this.repository.model.findById(devisId);
+    const devis = await this.getDevisById(devisId);
     devis.lignesSupplementaires.push(ligne);
     await devis.save();
     await DevisModel.updateTotal(devisId); // Recalculer le total
@@ -163,7 +174,7 @@ class DevisService extends BaseService {
   // Finaliser le devis (le marquer comme "terminé")
   async finalizeDevis(devisId, updateData = {}) {
     // Vérifier que le devis existe
-    const devis = await this.repository.model.findById(devisId);
+    const devis = await this.getDevisById(devisId);
 
     if (!devis) {
       throw new Error('Devis non trouvé');
@@ -278,7 +289,7 @@ class DevisService extends BaseService {
   // accepter le devis
   async acceptDevis(devisId, clientId) {
     // Vérifier que le devis existe
-    const devis = await this.repository.model.findById(devisId);
+    const devis = await this.getDevisById(devisId);
     if (!devis) {
       throw new Error('Devis non trouvé');
     }
@@ -305,7 +316,7 @@ class DevisService extends BaseService {
   // refuser le devis
   async refuserDevis(devisId, clientId) {
     // Vérifier que le devis existe
-    const devis = await this.repository.model.findById(devisId);
+    const devis = await this.getDevisById(devisId);
     if (!devis) {
       throw new Error('Devis non trouvé');
     }
@@ -428,7 +439,7 @@ async assignMecaniciens(devisId, mecaniciensIds, heuresDeTravail) {
   }
 
   // Trouver le devis à mettre à jour
-  const devis = await DevisModel.findById(devisId);
+  const devis = await this.getDevisById(devisId);
   if (!devis) {
     throw new Error("Devis non trouvé");
   }
@@ -634,20 +645,24 @@ async listDevisForMecanicien(mecanicienId, filter = {}, options = {}) {
 async listTasksForDevis(devisId) {
   try {
     // Trouver le devis par son ID
-    const devis = await this.repository.model.findById(devisId).populate([
-      {
-        path: 'servicesChoisis.service',
-        select: 'nom prix'
-      },
-      {
-        path: 'packsChoisis.servicePack',
-        select: 'nom prix remise'
-      },
-      {
-        path: 'lignesSupplementaires',
-        select: 'nom prix quantite type'
-      }
-    ]);
+    const devis = await this.repository.model.findById(id)
+  .populate('client', 'nom prenom email')
+  .populate('vehicule', 'immatricule marque modele')
+  .populate('reponduPar', 'nom prenom')
+  .populate({
+    path: 'servicesChoisis.service', // Populate service dans servicesChoisis
+    select: 'nom prix description'
+  })
+  .populate({
+    path: 'packsChoisis.servicePack', // Populate servicePack dans packsChoisis
+    select: 'nom description prix services', 
+    populate: { 
+      path: 'services', // Populate les services inclus dans le pack
+      select: 'nom prix'
+    }
+  })
+  .populate('mecaniciensTravaillant.mecanicien', 'nom prenom tarifHoraire');
+
 
     // Vérifier si le devis existe
     if (!devis) {
@@ -661,7 +676,7 @@ async listTasksForDevis(devisId) {
       tasks.push({
         type: 'service',
         taskId: task._id,
-        name: task.service.nom,
+        name: task.service.name,
         prix: task.prix,
         completed: task.completed,
         priorite: task.priorite
@@ -673,7 +688,7 @@ async listTasksForDevis(devisId) {
       tasks.push({
         type: 'pack',
         taskId: task._id,
-        name: task.servicePack.nom,
+        name: task.servicePack.name,
         prix: task.prix,
         completed: task.completed,
         priorite: task.priorite
