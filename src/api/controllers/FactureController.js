@@ -7,6 +7,7 @@ class FactureController extends BaseController {
     super(FactureService); // Injecter FactureService dans BaseController
     // Binder 'this' pour les méthodes spécifiques si nécessaire
     this.createFromReparation = this.createFromReparation.bind(this);
+    this.addTransaction = this.addTransaction.bind(this);
   }
 
   /**
@@ -39,6 +40,40 @@ class FactureController extends BaseController {
 
     } catch (error) {
         // Passer l'erreur au middleware de gestion d'erreurs global
+        next(error);
+    }
+  }
+
+  // Nouvelle méthode pour ajouter une transaction à une facture
+  async addTransaction(req, res, next) {
+    try {
+      const factureId = req.params.id;
+      const transactionData = req.body; 
+      
+      // Validation basique des données reçues
+      if (!factureId) {
+          return next(new AppError("L'ID de la facture est requis.", 400));
+      }
+      if (!transactionData || typeof transactionData !== 'object' || !transactionData.montant || !transactionData.modePaiement) {
+          return next(new AppError("Les données de transaction (montant, modePaiement) sont requises.", 400));
+      }
+      
+      // Appeler le service pour ajouter la transaction
+      // Le service retournera la facture mise à jour (ou juste la transaction ajoutée? à décider)
+      // Pour l'instant, supposons qu'il retourne la facture mise à jour
+      const updatedFacture = await this.service.addTransaction(factureId, transactionData);
+      
+      // Récupérer la dernière transaction ajoutée pour la réponse (plus spécifique)
+      const newTransaction = updatedFacture.transactions[updatedFacture.transactions.length - 1];
+      
+      res.status(201).json({
+        success: true,
+        message: 'Transaction ajoutée avec succès.',
+        data: newTransaction // Retourner la transaction créée
+        // Ou retourner la facture complète : data: updatedFacture 
+      });
+
+    } catch (error) {
         next(error);
     }
   }

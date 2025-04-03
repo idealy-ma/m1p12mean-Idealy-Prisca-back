@@ -5,6 +5,11 @@ const ReparationService = require('./ReparationService'); // Pour récupérer le
 const AppError = require('../utils/AppError'); // Utilitaire pour les erreurs HTTP
 const Counter = require('../models/Counter'); // Importer le modèle Counter
 
+// Helper pour comparer les montants flottants avec une tolérance
+const isAmountPaid = (totalPaye, montantTTC, tolerance = 0.01) => {
+  return Math.abs(totalPaye - montantTTC) < tolerance;
+};
+
 class FactureService extends BaseService {
   constructor() {
     super(FactureRepository); // Passer le repository Facture à BaseService
@@ -205,6 +210,70 @@ class FactureService extends BaseService {
     } catch (error) {
       console.error("Erreur dans FactureService.update:", error);
       throw new AppError("Erreur serveur lors de la mise à jour de la facture.", 500);
+    }
+  }
+
+  // --- Méthode spécifique pour ajouter une transaction --- 
+
+  /**
+   * Ajoute une transaction à une facture, met à jour le statut de la facture,
+   * et la sauvegarde.
+   * @param {string} factureId - L'ID de la facture.
+   * @param {object} transactionData - Données de la transaction (montant, modePaiement, reference?).
+   * @returns {Promise<Facture>} La facture mise à jour.
+   */
+  async addTransaction(factureId, transactionData) {
+    try {
+        const facture = await this.repository.findById(factureId);
+
+        if (!facture) {
+            throw new AppError('Facture non trouvée pour ajout de transaction.', 404);
+        }
+
+        // Vérifier si la facture peut accepter des paiements
+        if (['brouillon', 'validee', 'annulee', 'payee'].includes(facture.statut)) {
+            throw new AppError(`Impossible d'ajouter un paiement à une facture avec le statut ${facture.statut}.`, 400);
+        }
+
+        // Préparer la nouvelle transaction
+        const newTransaction = {
+            montant: transactionData.montant,
+            modePaiement: transactionData.modePaiement,
+            reference: transactionData.reference || null, // Référence optionnelle
+            statut: 'validee', // On suppose que le paiement est validé immédiatement
+            date: new Date() // Date actuelle
+        };
+        
+        // Ajouter la transaction au tableau
+        facture.transactions.push(newTransaction);
+
+        // Recalculer le total payé
+        const totalPaye = facture.transactions
+            .filter(tx => tx.statut === 'validee') // Ne compter que les transactions validées
+            .reduce((sum, tx) => sum + tx.montant, 0);
+
+        // Mettre à jour le statut de la facture
+        if (isAmountPaid(totalPaye, facture.montantTTC)) {
+             facture.statut = 'payee';
+        } else if (totalPaye > 0) {
+             facture.statut = 'partiellement_payee';
+        } // Sinon, le statut reste 'emise' ou 'en_retard'
+        
+        // Sauvegarder la facture avec la nouvelle transaction et le statut mis à jour
+        const savedFacture = await facture.save();
+        
+        // Retourner la facture populée
+        return await this.getById(savedFacture._id);
+
+    } catch (error) {
+        if (error instanceof AppError) {
+            throw error;
+        }
+        if (error.name === 'ValidationError') {
+             throw new AppError(`Erreur de validation lors de l\'ajout de la transaction: ${error.message}`, 400);
+        }
+        console.error("Erreur dans FactureService.addTransaction:", error);
+        throw new AppError("Erreur serveur lors de l\'ajout de la transaction.", 500);
     }
   }
 }

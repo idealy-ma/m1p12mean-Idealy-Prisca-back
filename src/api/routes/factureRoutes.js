@@ -38,4 +38,12 @@ router.patch(
     FactureController.update
 );
 
+// Nouvelle route pour ajouter une transaction
+router.post(
+    '/:id/transactions', 
+    protect,
+    authorize('manager'), // Seul un manager peut enregistrer un paiement
+    FactureController.addTransaction // Nouvelle méthode à ajouter au contrôleur
+);
+
 module.exports = router; 
