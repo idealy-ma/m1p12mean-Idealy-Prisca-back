@@ -31,7 +31,14 @@ router.post(
 router.post(
   '/:reparationId/photos',
   authorize('mecanicien', 'manager'), // Seuls mécanicien (assigné) et manager peuvent ajouter
-  ReparationController.addPhotoToReparation // Nouvelle méthode contrôleur
+  ReparationController.addPhotoToReparation
+);
+
+// Route pour mettre à jour le statut global d'une réparation (Manager seulement)
+router.patch(
+  '/:id/status', // Utiliser :id qui correspond au paramètre de la réparation
+  authorize('manager'), // Seul le manager peut changer le statut global
+  ReparationController.updateReparationStatus // Nouvelle méthode contrôleur
 );
 
 module.exports = router; 

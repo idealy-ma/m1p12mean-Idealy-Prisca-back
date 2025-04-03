@@ -1,5 +1,7 @@
 const ReparationService = require('../services/ReparationService');
 const mongoose = require('mongoose');
+const Vehicule = require('../models/Vehicule');
+const User = require('../models/User');
 
 class ReparationController {
 
@@ -74,26 +76,110 @@ class ReparationController {
    */
   getAllReparations = async (req, res, next) => {
     try {
-      // Extraire les paramètres de pagination, tri et filtre
-      const { page = 1, limit = 10, sort: sortQuery, ...filter } = req.query;
+      // Extraire searchTerm avec les autres filtres spécifiques
+      const { page = 1, limit = 10, sort: sortQuery, immatriculationFilter, searchTerm, ...otherFilters } = req.query;
       const pageNum = parseInt(page);
       const limitNum = parseInt(limit);
       const skipNum = (pageNum - 1) * limitNum;
       
-      // Parser le paramètre de tri JSON ou utiliser le défaut
-      let sortOption = { dateCreationReparation: -1 }; // Défaut
+      let sortOption = { dateCreationReparation: -1 }; 
       if (sortQuery) {
         try {
           sortOption = JSON.parse(sortQuery);
         } catch (e) {
           console.warn("Paramètre de tri invalide, utilisation du tri par défaut:", sortQuery);
-          // Garder le tri par défaut en cas d'erreur de parsing
         }
       }
       
-      // Appeler le service avec les arguments séparés
-      const results = await ReparationService.getAll(filter, sortOption, skipNum, limitNum);
-      const total = await ReparationService.repository.model.countDocuments(filter); // Compter le total pour la pagination
+      // Filtre de base avec les filtres directs (ex: statusReparation)
+      const filter = { ...otherFilters };
+      // Utiliser $and pour combiner tous les filtres complexes
+      const andConditions = [];
+      // Ajouter les filtres directs s'ils existent
+      if (Object.keys(otherFilters).length > 0) {
+          // Convertir otherFilters en structure Mongoose si nécessaire (ex: client ID)
+          if(otherFilters.client) otherFilters.client = new mongoose.Types.ObjectId(otherFilters.client);
+          andConditions.push(otherFilters);
+      }
+
+      // Gérer le filtre par immatriculation spécifique
+      if (immatriculationFilter) {
+        try {
+          const vehicles = await Vehicule.find({ 
+            immatriculation: { $regex: immatriculationFilter, $options: 'i' } 
+          }).select('_id');
+          const vehicleIds = vehicles.map(v => v._id);
+          andConditions.push({ vehicule: { $in: vehicleIds.length > 0 ? vehicleIds : [new mongoose.Types.ObjectId()] } });
+        } catch (vehError) {
+          console.error("Erreur filtre immatriculation:", vehError);
+        }
+      }
+
+      // Gérer le filtre général searchTerm
+      if (searchTerm) {
+        const searchRegex = { $regex: searchTerm, $options: 'i' };
+        const searchOrConditions = [];
+        let clientIds = [];
+        let vehicleIds = [];
+
+        try {
+          // Chercher les IDs clients correspondants
+          const clients = await User.find({
+            role: 'client',
+            $or: [
+              { nom: searchRegex },
+              { prenom: searchRegex },
+              { email: searchRegex },
+              { telephone: searchRegex }
+            ]
+          }).select('_id');
+          clientIds = clients.map(c => c._id);
+          if (clientIds.length > 0) {
+            searchOrConditions.push({ client: { $in: clientIds } });
+          }
+
+          // Chercher les IDs véhicules correspondants
+          const vehicles = await Vehicule.find({
+            $or: [
+              { marque: searchRegex },
+              { modele: searchRegex },
+              { immatriculation: searchRegex } // Recherche aussi ici
+            ]
+          }).select('_id');
+          vehicleIds = vehicles.map(v => v._id);
+          if (vehicleIds.length > 0) {
+            searchOrConditions.push({ vehicule: { $in: vehicleIds } });
+          }
+
+          // Ajouter d'autres champs directs de Reparation si pertinent
+          // searchOrConditions.push({ problemeDeclare: searchRegex });
+
+          // Si le terme de recherche est fourni mais ne correspond à rien (client/véhicule)
+          // et qu'il n'y a pas d'autres filtres, forcer aucun résultat.
+          if (searchOrConditions.length > 0) {
+             andConditions.push({ $or: searchOrConditions });
+          } else {
+             // Le terme de recherche ne correspond à aucun client/véhicule
+             // Ajouter une condition impossible pour qu'aucun document ne corresponde
+             andConditions.push({ _id: new mongoose.Types.ObjectId() }); 
+          }
+
+        } catch (searchError) {
+            console.error("Erreur lors de la recherche générale (searchTerm):", searchError);
+            // En cas d'erreur de recherche, ignorer ce filtre?
+            // Pour l'instant, on ignore.
+        }
+      }
+
+      // Appliquer la condition $and si elle contient des éléments
+      if (andConditions.length > 0) {
+          filter.$and = andConditions;
+      }
+      
+      // Utiliser getReparationsAvecDetails avec le filtre final
+      const results = await ReparationService.getReparationsAvecDetails(filter, sortOption, skipNum, limitNum);
+      // Compter avec le même filtre final
+      const total = await ReparationService.repository.model.countDocuments(filter); 
       
       res.status(200).json({
         success: true,
@@ -429,6 +515,71 @@ class ReparationController {
       if (error.name === 'ValidationError') {
         return res.status(400).json({ success: false, message: error.message, error: 'VALIDATION_ERROR', details: error.errors });
       }
+      next(error);
+    }
+  }
+
+  /**
+   * Met à jour le statut global d'une réparation (Manager seulement).
+   * @param {Object} req - Requête Express
+   * @param {Object} res - Réponse Express
+   * @param {Object} next - Fonction next d'Express
+   */
+  updateReparationStatus = async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      const { status, dateFinReelle } = req.body; // Nouveau statut et date de fin optionnelle
+
+      // Validation ID
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({ success: false, message: 'ID de réparation invalide.', error: 'INVALID_ID' });
+      }
+
+      // Valider que le statut reçu est une valeur valide de l'enum ReparationStatus
+      // CORRECTION: Utiliser un tableau statique des statuts valides
+      const validStatuses = ['Planifiée', 'En cours', 'En attente pièces', 'Terminée', 'Facturée', 'Annulée'];
+      if (!status || !validStatuses.includes(status)) {
+         return res.status(400).json({ success: false, message: `Statut '${status}' fourni invalide. Les statuts valides sont: ${validStatuses.join(', ')}.`, error: 'INVALID_STATUS' });
+      }
+
+      // Préparer les données de mise à jour
+      const updateData = { statusReparation: status };
+      // Si le statut est Terminé ou Annulé et qu'une date est fournie, l'ajouter
+      if ((status === 'Terminée' || status === 'Annulée') && dateFinReelle) {
+        updateData.dateFinReelle = new Date(dateFinReelle);
+      } else if (status !== 'Terminée' && status !== 'Annulée') {
+         // Optionnel: Effacer la date de fin si on passe à un autre statut
+         // A discuter: faut-il faire $unset ou mettre à null?
+         // Pour l'instant, on ne touche pas si non fournie.
+      }
+
+      // Pas besoin de vérifier le rôle ici, le middleware authorize('manager') l'a fait
+      
+      // Utiliser le BaseService pour mettre à jour
+      // Note: ReparationService hérite de BaseService qui a la méthode update
+      const updatedReparation = await ReparationService.update(id, updateData);
+
+      if (!updatedReparation) {
+        return res.status(404).json({ success: false, message: 'Réparation non trouvée lors de la mise à jour.', error: 'NOT_FOUND' });
+      }
+
+      // TODO: Ajouter une logique pour tracer ce changement (ex: dans etapesSuivi) si nécessaire
+
+      res.status(200).json({
+        success: true,
+        message: 'Statut de la réparation mis à jour avec succès.',
+        data: updatedReparation // Renvoyer la réparation complète mise à jour
+      });
+
+    } catch (error) {
+      console.error("Erreur dans updateReparationStatus:", error);
+      // Gérer les erreurs spécifiques (validation, etc.)
+      if (error.name === 'ValidationError') {
+        return res.status(400).json({ success: false, message: error.message, error: 'VALIDATION_ERROR', details: error.errors });
+      }
+       if (error.message === 'Entité non trouvée') { // Erreur venant potentiellement de BaseService.update
+         return res.status(404).json({ success: false, message: 'Réparation non trouvée lors de la mise à jour.', error: 'NOT_FOUND' });
+       }
       next(error);
     }
   }
