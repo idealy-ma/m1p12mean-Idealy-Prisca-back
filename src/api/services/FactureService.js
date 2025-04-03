@@ -186,19 +186,27 @@ class FactureService extends BaseService {
     }
   }
 
-  // Les méthodes create, update, delete peuvent généralement utiliser celles de BaseService
-  // sauf si une logique pré/post spécifique (autre que populate) est nécessaire.
-  // Par exemple, pour l'update, on pourrait vouloir recalculer les totaux si les lignes sont modifiées.
-
   // Exemple de surcharge de update si nécessaire :
-  /*
   async update(id, data) {
-      // Logique spécifique avant la mise à jour ?
-      const updatedEntity = await super.update(id, data); // Appel à la méthode parente
-      // Logique spécifique après la mise à jour ?
-      return updatedEntity;
+    try {
+      const facture = await this.repository.model.findById(id);
+      if (!facture) {
+        throw new AppError('Facture non trouvée', 404);
+      }
+
+      // Mettre à jour les champs de la facture avec les données fournies
+      Object.assign(facture, data);
+
+      const savedFacture = await facture.save();
+      
+      const populatedFacture = await this.getById(savedFacture._id); // Re-fetch avec populate
+      
+      return populatedFacture;
+    } catch (error) {
+      console.error("Erreur dans FactureService.update:", error);
+      throw new AppError("Erreur serveur lors de la mise à jour de la facture.", 500);
+    }
   }
-  */
 }
 
 module.exports = new FactureService(); 
