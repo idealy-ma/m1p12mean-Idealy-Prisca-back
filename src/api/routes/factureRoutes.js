@@ -46,4 +46,19 @@ router.post(
     FactureController.addTransaction // Nouvelle méthode à ajouter au contrôleur
 );
 
+router.delete(
+    '/:id',
+    protect,
+    authorize('manager'),
+    FactureController.delete 
+);
+
+// Nouvelle route pour les statistiques
+router.get(
+    '/stats/general', // Utiliser un chemin plus spécifique comme /stats/general
+    protect,
+    authorize('manager'), // Seuls les managers peuvent voir les stats globales
+    FactureController.getStats // Nouvelle méthode à ajouter au contrôleur
+);
+
 module.exports = router; 

@@ -8,6 +8,7 @@ class FactureController extends BaseController {
     // Binder 'this' pour les méthodes spécifiques si nécessaire
     this.createFromReparation = this.createFromReparation.bind(this);
     this.addTransaction = this.addTransaction.bind(this);
+    this.getStats = this.getStats.bind(this);
   }
 
   /**
@@ -72,6 +73,22 @@ class FactureController extends BaseController {
         data: newTransaction // Retourner la transaction créée
         // Ou retourner la facture complète : data: updatedFacture 
       });
+
+    } catch (error) {
+        next(error);
+    }
+  }
+
+  // Nouvelle méthode pour récupérer les statistiques
+  async getStats(req, res, next) {
+    try {
+        // Appeler le service pour calculer et récupérer les statistiques
+        const stats = await this.service.getStats(); 
+        
+        res.status(200).json({
+            success: true,
+            data: stats
+        });
 
     } catch (error) {
         next(error);

@@ -4,6 +4,7 @@ const ReparationRepository = require('../models/Reparation').model; // Importer 
 const ReparationService = require('./ReparationService'); // Pour récupérer les détails de la réparation
 const AppError = require('../utils/AppError'); // Utilitaire pour les erreurs HTTP
 const Counter = require('../models/Counter'); // Importer le modèle Counter
+const mongoose = require('mongoose'); // Importer mongoose pour ObjectId
 
 // Helper pour comparer les montants flottants avec une tolérance
 const isAmountPaid = (totalPaye, montantTTC, tolerance = 0.01) => {
@@ -274,6 +275,112 @@ class FactureService extends BaseService {
         }
         console.error("Erreur dans FactureService.addTransaction:", error);
         throw new AppError("Erreur serveur lors de l\'ajout de la transaction.", 500);
+    }
+  }
+
+  // --- Méthode spécifique pour les statistiques --- 
+  
+  /**
+   * Calcule et retourne des statistiques globales sur les factures.
+   * @returns {Promise<object>} Un objet contenant diverses statistiques.
+   */
+  async getStats() {
+    try {
+        const now = new Date();
+
+        // Utilisation du framework d'agrégation de Mongoose
+        const stats = await this.repository.model.aggregate([
+            // Étape 1: Filtrer les factures annulées (optionnel, mais courant)
+            { $match: { statut: { $ne: 'annulee' } } }, 
+            
+            // Étape 2: Calculer le total payé par facture
+            {
+                $addFields: {
+                    totalPayeValide: {
+                        $reduce: {
+                            input: "$transactions",
+                            initialValue: 0,
+                            in: {
+                                $add: [
+                                    "$$value",
+                                    { $cond: [ { $eq: [ "$$this.statut", "validee" ] }, "$$this.montant", 0 ] }
+                                ]
+                            }
+                        }
+                    }
+                }
+            },
+            
+            // Étape 3: Regrouper pour calculer les statistiques globales
+            {
+                $group: {
+                    _id: null, // Regrouper tous les documents
+                    totalFactures: { $sum: 1 },
+                    totalFactureTTC: { $sum: "$montantTTC" },
+                    totalPayeGlobal: { $sum: "$totalPayeValide" },
+                    nombrePayees: {
+                        $sum: { $cond: [ { $eq: ["$statut", "payee"] }, 1, 0 ] }
+                    },
+                    nombrePartiellementPayees: {
+                         $sum: { $cond: [ { $eq: ["$statut", "partiellement_payee"] }, 1, 0 ] }
+                    },
+                    nombreEmisesNonPayees: { // Inclut émises et partiellement payées
+                         $sum: { $cond: [ { $in: ["$statut", ['emise', 'partiellement_payee']] }, 1, 0 ] }
+                    },
+                     nombreEnRetard: {
+                        $sum: {
+                            $cond: [
+                                { 
+                                    $and: [
+                                        { $in: [ "$statut", ["emise", "partiellement_payee"] ] }, // Statut pertinent
+                                        { $lt: [ "$dateEcheance", now ] } // Date d'échéance dépassée
+                                    ]
+                                }, 
+                                1, // Compter si en retard
+                                0 // Ne pas compter sinon
+                            ]
+                        }
+                    }
+                }
+            },
+            
+            // Étape 4: Mettre en forme le résultat
+            {
+                $project: {
+                    _id: 0, // Ne pas inclure l'ID null du groupe
+                    totalFactures: 1,
+                    totalFactureTTC: 1,
+                    totalPayeGlobal: 1,
+                    montantRestantGlobal: { $subtract: ["$totalFactureTTC", "$totalPayeGlobal"] },
+                    nombrePayees: 1,
+                    nombrePartiellementPayees: 1,
+                    nombreEnAttentePaiement: "$nombreEmisesNonPayees", // Renommer pour clarté
+                    nombreEnRetard: 1
+                }
+            }
+        ]);
+
+        // Si aucune facture n'existe (sauf annulées), l'agrégation retourne un tableau vide.
+        // Retourner un objet avec des zéros dans ce cas.
+        if (stats.length === 0) {
+            return {
+                totalFactures: 0,
+                totalFactureTTC: 0,
+                totalPayeGlobal: 0,
+                montantRestantGlobal: 0,
+                nombrePayees: 0,
+                nombrePartiellementPayees: 0,
+                nombreEnAttentePaiement: 0,
+                nombreEnRetard: 0
+            };
+        }
+
+        // Retourner le premier (et unique) élément du tableau de résultats
+        return stats[0];
+
+    } catch (error) {
+        console.error("Erreur dans FactureService.getStats:", error);
+        throw new AppError("Erreur serveur lors du calcul des statistiques de facturation.", 500);
     }
   }
 }
