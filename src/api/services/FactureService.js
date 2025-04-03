@@ -123,6 +123,82 @@ class FactureService extends BaseService {
         throw new AppError("Impossible de générer le numéro de facture.", 500);
     }
   }
+
+  // --- Surcharge des méthodes de BaseService pour ajouter .populate() ---
+
+  /**
+   * Récupère une facture par son ID avec les champs associés populés.
+   * @param {string} id - L'ID de la facture.
+   * @returns {Promise<Facture>} L'entité trouvée et populée.
+   */
+  async getById(id) {
+    try {
+      const entity = await this.repository.model.findById(id)
+        .populate('client')
+        .populate('vehicule')
+        .populate('reparation') // Populer la réparation liée
+        .populate('devis') // Populer le devis lié
+        .exec(); // Exécuter la requête avec populate
+       
+      if (!entity) {
+        // Utiliser AppError pour une gestion d'erreur cohérente
+        throw new AppError('Facture non trouvée', 404);
+      }
+      return entity;
+    } catch (error) {
+      // Relancer l'erreur pour qu'elle soit gérée par le contrôleur/middleware
+      // Si ce n'est pas déjà une AppError, l'encapsuler pourrait être une option
+      if (!(error instanceof AppError)) {
+          console.error("Erreur non gérée dans FactureService.getById:", error);
+          throw new AppError("Erreur serveur lors de la récupération de la facture.", 500);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Récupère toutes les factures avec les champs associés populés.
+   * @param {Object} filter - Filtre pour la recherche
+   * @param {Object} options - Options de tri, pagination (skip, limit)
+   * @returns {Promise<Array<Facture>>} Les entités trouvées et populées.
+   */
+  async getAll(filter = {}, options = {}) {
+    try {
+        const { sort = { dateEmission: -1 }, skip = 0, limit = 0 } = options;
+
+        let query = this.repository.model.find(filter)
+            .populate('client')
+            .populate('vehicule')
+            .populate('reparation', 'statusReparation') // Ne populer que le statut si besoin
+            .sort(sort);
+       
+        if (skip > 0) {
+            query = query.skip(skip);
+        }
+        if (limit > 0) {
+            query = query.limit(limit);
+        }
+
+        return await query.exec();
+    } catch (error) {
+      console.error("Erreur dans FactureService.getAll:", error);
+      throw new AppError("Erreur serveur lors de la récupération des factures.", 500);
+    }
+  }
+
+  // Les méthodes create, update, delete peuvent généralement utiliser celles de BaseService
+  // sauf si une logique pré/post spécifique (autre que populate) est nécessaire.
+  // Par exemple, pour l'update, on pourrait vouloir recalculer les totaux si les lignes sont modifiées.
+
+  // Exemple de surcharge de update si nécessaire :
+  /*
+  async update(id, data) {
+      // Logique spécifique avant la mise à jour ?
+      const updatedEntity = await super.update(id, data); // Appel à la méthode parente
+      // Logique spécifique après la mise à jour ?
+      return updatedEntity;
+  }
+  */
 }
 
 module.exports = new FactureService(); 
