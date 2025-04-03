@@ -47,6 +47,15 @@ router.put(
     FactureController.update // Méthode héritée
 );
 
+// PATCH /api/factures/:id - Mettre à jour partiellement une facture (ex: statut) (manager seulement)
+// Ajout de la route PATCH manquante
+router.patch(
+    '/:id',
+    protect,
+    authorize('manager'),
+    FactureController.update // Pointe vers la même méthode update que PUT
+);
+
 // DELETE /api/factures/:id - Supprimer une facture (généralement non recommandé, préférer annulation)
 // Accessible uniquement aux managers (si cette action est permise).
 router.delete(
