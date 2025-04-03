@@ -6,9 +6,12 @@ const config = require('./src/config');
 const routes = require('./src/api/routes');
 const errorHandler = require('./src/api/middlewares/errorHandler');
 const AppError = require('./src/api/utils/AppError');
+const mongoose = require('mongoose');
 
 // Initialiser l'application Express
 const app = express();
+
+mongoose.set('debug', true); 
 
 // Middleware pour parser le corps des requêtes
 app.use(bodyParser.json());

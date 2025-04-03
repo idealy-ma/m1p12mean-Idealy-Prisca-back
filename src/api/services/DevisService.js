@@ -2,6 +2,7 @@ const BaseService = require('./BaseService');
 const DevisModel = require('../models/Devis');
 const UserModel = require('../models/User');
 const mongoose = require('mongoose');
+const Reparation = require('../models/Reparation');
 
 /**
  * Service pour gérer les devis
@@ -277,30 +278,114 @@ class DevisService extends BaseService {
   }
   // accepter le devis
   async acceptDevis(devisId, clientId) {
-    // Vérifier que le devis existe
-    const devis = await this.repository.model.findById(devisId);
+    const devis = await this.repository.model.findById(devisId)
+        .populate('servicesChoisis.service')
+        .populate('packsChoisis.servicePack')
+        .populate('mecaniciensTravaillant.mecanicien', '_id'); // Seulement l'ID pour la référence
     if (!devis) {
       throw new Error('Devis non trouvé');
     }
-
-    // Vérifier que le client est bien le propriétaire du devis
     if (devis.client.toString() !== clientId.toString()) {
       throw new Error('Vous n\'êtes pas autorisé à accepter ce devis');
     }
 
-    // Vérifier que le devis est en attente ou terminé
     if (devis.status !== 'en_attente' && devis.status !== 'termine') {
-      throw new Error('Ce devis ne peut plus être accepté');
+        throw new Error('Ce devis ne peut plus être accepté (statut actuel: ' + devis.status + ')');
     }
 
-    // Vérifier que le devis a au moins un service ou un pack
     if (devis.servicesChoisis.length === 0 && devis.packsChoisis.length === 0 && devis.lignesSupplementaires.length === 0) {
-      throw new Error('Le devis doit contenir au moins un service ou un pack ou une ligne supplémentaire');
+      throw new Error('Le devis doit contenir au moins un service, un pack ou une ligne supplémentaire pour être accepté');
     }
 
-    // Accepter le devis
-    await DevisModel.acceptDevis(devisId);
-    return { message: 'Devis accepté avec succès' };
+    const existingReparation = await Reparation.model.findOne({ devisOrigine: devisId });
+    if (existingReparation) {
+        if (devis.status !== 'accepte') {
+            await this.repository.acceptDevis(devisId);
+        }
+        return {
+            message: 'Devis déjà accepté. Réparation déjà existante.',
+            reparationId: existingReparation._id // Retourner l'ID existant
+        };
+    }
+
+    // Générer les étapes initiales à partir des services, packs et lignes supplémentaires
+    let initialEtapes = [];
+    console.log('devis', devis.servicesChoisis);
+    
+    // Ajouter les étapes depuis servicesChoisis
+    if (Array.isArray(devis.servicesChoisis)) {
+        devis.servicesChoisis
+            .filter(s => s && s.service && s.service.name) // Assurer que le service et son name sont présents
+            .forEach(s => {
+                initialEtapes.push({
+                    titre: s.service.name, // Utiliser le nom du service populé
+                    description: s.note || `Réaliser le service: ${s.service.name}`,
+                    status: 'En attente' // Statut initial pour une étape
+                });
+            });
+    }
+
+    // Ajouter les étapes depuis packsChoisis
+    if (Array.isArray(devis.packsChoisis)) {
+        devis.packsChoisis
+            .filter(p => p && p.servicePack && p.servicePack.name) // Assurer que le pack et son name sont présents
+            .forEach(p => {
+                initialEtapes.push({
+                    titre: p.servicePack.name,
+                    description: p.note || `Réaliser le pack: ${p.servicePack.name}`,
+                    status: 'En attente'
+                });
+            });
+    }
+
+    // Traiter les lignes supplémentaires, en gérant le cas où elles sont stockées comme une chaîne JSON dans la BDD
+    let processedLignesSupplementaires = [];
+    if (Array.isArray(devis.lignesSupplementaires)) {
+        // Si c'est déjà un tableau (cas normal), on le prend tel quel
+        processedLignesSupplementaires = devis.lignesSupplementaires;
+    }
+
+    // Ajouter les étapes depuis le tableau traité lignesSupplementaires
+    processedLignesSupplementaires
+        .filter(l => l && typeof l.nom === 'string' && l.nom.trim() !== '') // Assurer que la ligne a un nom
+        .forEach(l => {
+            initialEtapes.push({
+                titre: l.nom,
+                description: l.note || 'Effectuer: ' + l.nom,
+                status: 'En attente'
+            });
+        });
+
+    const reparationData = {
+        devisOrigine: devis._id,
+        client: devis.client,
+        vehicule: devis.vehicule,
+        mecaniciensAssignes: devis.mecaniciensTravaillant
+            .filter(mt => mt && mt.mecanicien && mt.mecanicien._id)
+            .map(mt => ({ mecanicien: mt.mecanicien._id })),
+        statusReparation: 'Planifiée', // Statut initial
+        servicesInclus: devis.servicesChoisis.map(s => ({ service: s.service._id, prix: s.prix, note: s.note })),
+        packsInclus: devis.packsChoisis.map(p => ({ servicePack: p.servicePack._id, prix: p.prix, note: p.note })),
+        problemeDeclare: devis.probleme,
+        etapesSuivi: initialEtapes, // Utiliser les étapes générées
+        photos: [], // Initialement vide
+        notesInternes: [],
+        dateDebutPrevue: devis.preferredDate, // Utiliser la date préférée du devis comme date prévue ?
+        // dateFinPrevue:  // A calculer ou définir plus tard
+        coutEstime: devis.total,
+    };
+
+    // 4. Créer et sauvegarder la nouvelle réparation
+    const nouvelleReparation = new Reparation.model(reparationData);
+    await nouvelleReparation.save();
+
+    await this.repository.acceptDevis(devisId);
+
+
+    return {
+        message: 'Devis accepté avec succès et réparation planifiée.',
+        reparationId: nouvelleReparation._id
+    };
   }
   // refuser le devis
   async refuserDevis(devisId, clientId) {
