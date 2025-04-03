@@ -282,7 +282,6 @@ class DevisService extends BaseService {
         .populate('servicesChoisis.service')
         .populate('packsChoisis.servicePack')
         .populate('mecaniciensTravaillant.mecanicien', '_id'); // Seulement l'ID pour la référence
-
     if (!devis) {
       throw new Error('Devis non trouvé');
     }
@@ -298,7 +297,7 @@ class DevisService extends BaseService {
       throw new Error('Le devis doit contenir au moins un service, un pack ou une ligne supplémentaire pour être accepté');
     }
 
-    const existingReparation = await Reparation.findOne({ devisOrigine: devisId });
+    const existingReparation = await Reparation.model.findOne({ devisOrigine: devisId });
     if (existingReparation) {
         if (devis.status !== 'accepte') {
             await this.repository.acceptDevis(devisId);
@@ -311,15 +310,16 @@ class DevisService extends BaseService {
 
     // Générer les étapes initiales à partir des services, packs et lignes supplémentaires
     let initialEtapes = [];
-
+    console.log('devis', devis.servicesChoisis);
+    
     // Ajouter les étapes depuis servicesChoisis
     if (Array.isArray(devis.servicesChoisis)) {
         devis.servicesChoisis
-            .filter(s => s && s.service && s.service.nom) // Assurer que le service et son nom sont présents
+            .filter(s => s && s.service && s.service.name) // Assurer que le service et son name sont présents
             .forEach(s => {
                 initialEtapes.push({
-                    titre: s.service.nom, // Utiliser le nom du service populé
-                    description: s.note || `Réaliser le service: ${s.service.nom}`,
+                    titre: s.service.name, // Utiliser le nom du service populé
+                    description: s.note || `Réaliser le service: ${s.service.name}`,
                     status: 'En attente' // Statut initial pour une étape
                 });
             });
@@ -328,11 +328,11 @@ class DevisService extends BaseService {
     // Ajouter les étapes depuis packsChoisis
     if (Array.isArray(devis.packsChoisis)) {
         devis.packsChoisis
-            .filter(p => p && p.servicePack && p.servicePack.nom) // Assurer que le pack et son nom sont présents
+            .filter(p => p && p.servicePack && p.servicePack.name) // Assurer que le pack et son name sont présents
             .forEach(p => {
                 initialEtapes.push({
-                    titre: p.servicePack.nom,
-                    description: p.note || `Réaliser le pack: ${p.servicePack.nom}`,
+                    titre: p.servicePack.name,
+                    description: p.note || `Réaliser le pack: ${p.servicePack.name}`,
                     status: 'En attente'
                 });
             });
@@ -376,7 +376,7 @@ class DevisService extends BaseService {
     };
 
     // 4. Créer et sauvegarder la nouvelle réparation
-    const nouvelleReparation = new Reparation(reparationData);
+    const nouvelleReparation = new Reparation.model(reparationData);
     await nouvelleReparation.save();
 
     await this.repository.acceptDevis(devisId);

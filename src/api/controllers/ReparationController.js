@@ -310,20 +310,35 @@ class ReparationController {
         return res.status(404).json({ success: false, message: 'Étape non trouvée dans cette réparation.', error: 'STEP_NOT_FOUND' });
       }
 
+      // Sauvegarder l'ancien statut de l'étape et le statut global actuel
+      const ancienStatutEtape = reparation.etapesSuivi[etapeIndex].status;
+      const statutGlobalActuel = reparation.statusReparation;
+
       // Mettre à jour le statut de l'étape
       reparation.etapesSuivi[etapeIndex].status = status;
       // Mettre à jour la date de fin si fournie et si le statut est 'terminee' ou 'annulee'
-      if ((status === 'terminee' || status === 'annulee') && dateFin) {
+      if ((status === 'Terminée') && dateFin) { // Simplifié car annulée n'est pas un statut d'étape
           reparation.etapesSuivi[etapeIndex].dateFin = new Date(dateFin);
-      } else if (status === 'en_cours' || status === 'en_attente') {
-          // Optionnel: Effacer la date de fin si on revient à un statut non terminé
+      } else if (status === 'En cours' && !reparation.etapesSuivi[etapeIndex].dateDebut) {
+          // Ajouter date de début si elle n'existe pas déjà quand on passe à En cours
+          reparation.etapesSuivi[etapeIndex].dateDebut = new Date();
+      } else if (status === 'En attente') {
+          // Optionnel: Effacer la date de fin et début si on revient à En attente
           reparation.etapesSuivi[etapeIndex].dateFin = undefined;
+          reparation.etapesSuivi[etapeIndex].dateDebut = undefined; // Effacer aussi le début?
       }
       
+      // --- Logique pour mettre à jour le statut global de la réparation --- 
+      // Si on démarre une étape (passe à "En cours") et que la réparation est encore "Planifiée"
+      if (status === 'En cours' && statutGlobalActuel === 'Planifiée') {
+        reparation.statusReparation = 'En cours';
+        console.log(`Reparation ${reparationId} passée à 'En cours' car une étape a démarré.`);
+      }
+
       // Marquer le tableau comme modifié pour Mongoose
       reparation.markModified('etapesSuivi');
 
-      // Sauvegarder la réparation
+      // Sauvegarder la réparation (sauvegarde le statut de l'étape ET potentiellement le statut global)
       const reparationMiseAJour = await reparation.save();
 
       // Renvoyer l'étape mise à jour
