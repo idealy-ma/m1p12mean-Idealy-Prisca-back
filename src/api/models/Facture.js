@@ -1,6 +1,10 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 const BaseModel = require('./BaseModel'); // Importer BaseModel
+const User = require('./User'); 
+const Vehicule = require('./Vehicule');
+const Reparation = require('./Reparation');
+const Devis = require('./Devis');
 
 // Sous-schéma pour les lignes de facture
 const LigneFactureSchema = new Schema({
@@ -23,22 +27,23 @@ const LigneFactureSchema = new Schema({
         required: [true, 'Le taux de TVA est requis.'],
         default: 20 // Valeur par défaut si non fournie
     },
-    montantHT: { 
-        type: Number,
-        required: true 
+    montantHT: { // Calculé par pre-save hook
+        type: Number 
+        // required: false (ou omis) 
     },
-    montantTVA: { 
-        type: Number,
-        required: true 
+    montantTVA: { // Calculé par pre-save hook
+        type: Number
+        // required: false (ou omis) 
     },
-    montantTTC: { 
-        type: Number,
-        required: true 
+    montantTTC: { // Calculé par pre-save hook
+        type: Number
+        // required: false (ou omis) 
     },
     type: {
         type: String,
-        enum: ['piece', 'main_oeuvre'],
-        required: [true, 'Le type de ligne est requis (piece ou main_oeuvre).']
+        // Ajouter 'service' et 'pack' aux valeurs possibles
+        enum: ['piece', 'main_oeuvre', 'service', 'pack'], 
+        required: [true, 'Le type de ligne est requis.']
     },
     reference: { // Référence pour les pièces
         type: String 
@@ -126,20 +131,20 @@ const FactureSchema = new Schema({
         type: [LigneFactureSchema],
         validate: [v => Array.isArray(v) && v.length > 0, 'La facture doit contenir au moins une ligne.']
     },
-    montantHT: {
+    montantHT: { // Calculé par pre-save hook
         type: Number,
-        required: true,
         min: 0
+        // required: false (ou omis) 
     },
-    montantTVA: {
+    montantTVA: { // Calculé par pre-save hook
         type: Number,
-        required: true,
         min: 0
+        // required: false (ou omis) 
     },
-    montantTTC: {
+    montantTTC: { // Calculé par pre-save hook
         type: Number,
-        required: true,
         min: 0
+        // required: false (ou omis) 
     },
     remise: { 
         type: RemiseSchema 
@@ -178,14 +183,19 @@ const FactureSchema = new Schema({
 FactureSchema.pre('save', function(next) {
     let totalHT = 0;
     this.lignesFacture.forEach(ligne => {
-        ligne.montantHT = ligne.quantite * ligne.prixUnitaireHT;
-        ligne.montantTVA = ligne.montantHT * (ligne.tauxTVA / 100);
+        // S'assurer que les valeurs existent avant de calculer
+        const qte = ligne.quantite || 0;
+        const prix = ligne.prixUnitaireHT || 0;
+        const taux = ligne.tauxTVA || 0;
+        
+        ligne.montantHT = qte * prix;
+        ligne.montantTVA = ligne.montantHT * (taux / 100);
         ligne.montantTTC = ligne.montantHT + ligne.montantTVA;
         totalHT += ligne.montantHT;
     });
     this.montantHT = totalHT;
-    this.montantTVA = this.lignesFacture.reduce((sum, ligne) => sum + ligne.montantTVA, 0);
-    const remiseMontant = this.remise ? this.remise.montant : 0;
+    this.montantTVA = this.lignesFacture.reduce((sum, ligne) => sum + (ligne.montantTVA || 0), 0);
+    const remiseMontant = this.remise ? (this.remise.montant || 0) : 0;
     this.montantTTC = this.montantHT + this.montantTVA - remiseMontant;
     next();
 });

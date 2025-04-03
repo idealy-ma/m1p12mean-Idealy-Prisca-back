@@ -34,7 +34,7 @@ class FactureService extends BaseService {
     if (reparation.statusReparation !== 'Terminée') { 
       throw new AppError('La réparation doit être terminée pour être facturée.', 400);
     }
-    const existingFacture = await this.repository.findOne({ reparation: reparationId });
+    const existingFacture = await this.repository.model.findOne({ reparation: reparationId });
     if (existingFacture) {
       throw new AppError('Une facture existe déjà pour cette réparation.', 409); 
     }
@@ -55,7 +55,7 @@ class FactureService extends BaseService {
           throw new AppError(`Détails du service manquant ou invalide pour la facturation (ID: ${item.service}).`, 500);
       }
       lignesFacture.push({
-          designation: item.service.nom,
+          designation: item.service.name,
           quantite: 1, 
           prixUnitaireHT: item.prix, 
           tauxTVA: item.service.tauxTVA || 20, // Utiliser TVA du service ou 20% par défaut
@@ -69,7 +69,7 @@ class FactureService extends BaseService {
             throw new AppError(`Détails du pack manquant ou invalide pour la facturation (ID: ${packItem.servicePack}).`, 500);
         }
         lignesFacture.push({
-            designation: `Pack: ${packItem.servicePack.nom}`, 
+            designation: `Pack: ${packItem.servicePack.name}`, 
             quantite: 1,
             prixUnitaireHT: packItem.prix,
             tauxTVA: packItem.servicePack.tauxTVA || 20, // Utiliser TVA du pack ou 20% par défaut
