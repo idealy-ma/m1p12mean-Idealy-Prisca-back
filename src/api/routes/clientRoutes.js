@@ -28,6 +28,10 @@ router.post('/devis/:devisId/accept', DevisController.accepteDevis);
 router.post('/devis/:devisId/decline', DevisController.declineDevis);
 router.get('/devis/:devisId/tasks', DevisController.getTasksForDevis);
 
+// --- AJOUT ROUTE HISTORIQUE CHAT ---
+router.get('/devis/:devisId/messages', DevisController.getChatMessages);
+// --- FIN AJOUT ---
+
 // Routes Réparations
 router.get('/reparations', ClientController.getClientReparations);
 

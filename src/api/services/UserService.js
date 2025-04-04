@@ -180,6 +180,8 @@ class UserService extends BaseService {
       { 
         id: user._id,
         role: user.role,
+        nom: user.nom,
+        prenom: user.prenom,
         email: user.email
       },
       config.jwt.secret,
