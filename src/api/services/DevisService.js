@@ -835,6 +835,41 @@ async addServicePack(devisId, packData) {
   return devis;
 }
 
+// --- AJOUT DE LA MÉTHODE POUR RÉCUPÉRER LES MESSAGES DU CHAT ---
+async getChatMessages(devisId, userId, userRole) {
+  try {
+    // Vérifier si l'ID est valide
+    if (!mongoose.Types.ObjectId.isValid(devisId)) {
+      throw new Error('ID de devis invalide');
+    }
+
+    // Récupérer uniquement le champ chatMessages et les informations de base pour la vérification
+    const devis = await this.repository.model.findById(devisId, 
+      'client chatMessages status' // Sélectionner les champs nécessaires
+    );
+
+    // Vérifier si le devis existe
+    if (!devis) {
+      throw new Error('Devis non trouvé');
+    }
+
+    // Vérification d'autorisation : Le client ne peut voir que ses propres devis,
+    // le manager peut voir tous les devis (on suppose, à adapter si règles plus strictes).
+    if (userRole === 'client' && devis.client.toString() !== userId.toString()) {
+        throw new Error('Accès non autorisé à ces messages de devis.');
+    }
+
+    // Retourner le tableau des messages
+    // Les messages contiennent déjà le senderName comme sauvegardé.
+    return devis.chatMessages || [];
+
+  } catch (error) {
+    // Propager l'erreur pour être gérée par le contrôleur
+    throw error;
+  }
+}
+// --- FIN DE L'AJOUT ---
+
 }
 
 module.exports = new DevisService(); 

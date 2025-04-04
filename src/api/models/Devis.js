@@ -78,7 +78,14 @@ const devisSchema = new mongoose.Schema({
   urlPhotos: {
     type: [String],
     default: []     
-  }
+  },
+  chatMessages: [{
+    sender: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    senderName: { type: String, required: true }, // Ajout du nom pour l'option 2a
+    senderRole: { type: String, enum: ['client', 'manager'], required: true },
+    message: { type: String, required: true, trim: true },
+    timestamp: { type: Date, default: Date.now }
+  }]
 }, {
   timestamps: true,
   toJSON: { virtuals: true },

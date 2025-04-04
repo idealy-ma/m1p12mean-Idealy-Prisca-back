@@ -43,6 +43,10 @@ router.post('/devis/:devisId/ligne-supplementaire', DevisController.addLigneSupp
 // Route pour assigner des mécaniciens à un devis
 router.post('/devis/assigner-mecaniciens', DevisController.assignMecaniciens);
 
+// --- AJOUT ROUTE HISTORIQUE CHAT ---
+router.get('/devis/:devisId/messages', DevisController.getChatMessages);
+// --- FIN AJOUT ---
+
 router.get('/dashboard', (req, res) => {
   res.status(200).json({
     success: true,

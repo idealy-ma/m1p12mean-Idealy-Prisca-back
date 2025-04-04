@@ -527,6 +527,47 @@ addServicePack = async (req, res, next) => {
   }
 };
 
+// --- AJOUT DU CONTROLEUR POUR LES MESSAGES DU CHAT ---
+getChatMessages = async (req, res, next) => {
+  try {
+    const { devisId } = req.params;
+    const userId = req.user._id; // ID de l'utilisateur authentifié
+    const userRole = req.user.role; // Rôle de l'utilisateur authentifié
+
+    // Vérifier si l'ID est fourni
+    if (!devisId) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID du devis non fourni'
+      });
+    }
+
+    const messages = await this.service.getChatMessages(devisId, userId, userRole);
+
+    // Envoyer la réponse avec les messages
+    res.status(200).json({
+      success: true,
+      message: 'Messages du chat récupérés avec succès',
+      data: messages
+    });
+
+  } catch (error) {
+    // Gérer les erreurs spécifiques (Not Found, Unauthorized, Invalid ID)
+    if (error.message === 'ID de devis invalide') {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+    if (error.message === 'Devis non trouvé') {
+      return res.status(404).json({ success: false, message: error.message });
+    }
+    if (error.message === 'Accès non autorisé à ces messages de devis.') {
+        return res.status(403).json({ success: false, message: error.message });
+    }
+    // Passer les autres erreurs au gestionnaire d'erreurs global
+    next(error);
+  }
+}
+// --- FIN DE L'AJOUT ---
+
 }
 
 module.exports = new DevisController(); 
