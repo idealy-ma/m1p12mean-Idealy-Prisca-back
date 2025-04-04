@@ -6,6 +6,8 @@ const clientRoutes = require('./clientRoutes');
 const reparationRoutes = require('./reparationRoutes');
 // Import facture routes
 const factureRoutes = require('./factureRoutes');
+const statistiqueRoutes = require('./statistiqueRoutes'); // Ajustez le chemin si nécessaire
+
 // Importez d'autres routes ici au fur et à mesure que vous les créez
 
 const router = express.Router();
@@ -20,6 +22,7 @@ router.use('/users', userRoutes);
 router.use('/manager', managerRoutes);
 router.use('/mecanicien', mecanicienRoutes);
 router.use('/client', clientRoutes);
+router.use('/stats', statistiqueRoutes); // Toutes les routes commenceront par /api/stats
 
 // Routes pour les réparations
 router.use('/reparations', reparationRoutes);
