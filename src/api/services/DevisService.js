@@ -3,6 +3,7 @@ const DevisModel = require('../models/Devis');
 const UserModel = require('../models/User');
 const mongoose = require('mongoose');
 const Reparation = require('../models/Reparation');
+const NotificationService = require('./NotificationService');
 
 /**
  * Service pour gérer les devis
@@ -162,7 +163,7 @@ class DevisService extends BaseService {
   }
 
   // Finaliser le devis (le marquer comme "terminé")
-  async finalizeDevis(devisId, updateData = {}) {
+  async finalizeDevis(devisId, updateData = {}, managerId) {
     // Vérifier que le devis existe
     const devis = await this.repository.model.findById(devisId);
 
@@ -270,6 +271,30 @@ class DevisService extends BaseService {
       .populate('packsChoisis.servicePack')
       .populate('mecaniciensTravaillant.mecanicien', 'nom prenom tarifHoraire');
 
+    updatedDevis.status = 'termine';
+    updatedDevis.dateReponse = new Date();
+    updatedDevis.reponduPar = managerId; // Stocker qui a finalisé
+    await updatedDevis.save();
+    
+    // Recalculer le total final
+    await DevisModel.updateTotal(devisId);
+    
+    // --- AJOUT NOTIFICATION POUR CLIENT ---
+    try {
+        await NotificationService.createAndSendNotification({
+            recipientId: updatedDevis.client._id, // ID du client
+            type: 'DEVIS_FINALIZED',
+            message: `Votre devis N°${devisId.slice(-6)} est prêt. Vous pouvez le consulter et y répondre.`, 
+            link: `/client/devis/${devisId}`,
+            senderId: managerId, // ID du manager
+            entityId: devisId
+        });
+        console.log(`Notification DEVIS_FINALIZED envoyée au client ${updatedDevis.client._id} pour devis ${devisId}`);
+    } catch (notifError) {
+        console.error("Erreur lors de l'envoi de la notification DEVIS_FINALIZED:", notifError);
+    }
+    // --- FIN NOTIFICATION ---
+
     // Retourner un message de succès avec les détails du devis
     return { 
       message: 'Devis finalisé avec succès', 
@@ -278,136 +303,84 @@ class DevisService extends BaseService {
   }
   // accepter le devis
   async acceptDevis(devisId, clientId) {
-    const devis = await this.repository.model.findById(devisId)
-        .populate('servicesChoisis.service')
-        .populate('packsChoisis.servicePack')
-        .populate('mecaniciensTravaillant.mecanicien', '_id'); // Seulement l'ID pour la référence
+    const devis = await this.repository.model.findById(devisId).populate('client', 'nom prenom'); // Peuple client
+
     if (!devis) {
       throw new Error('Devis non trouvé');
     }
-    if (devis.client.toString() !== clientId.toString()) {
-      throw new Error('Vous n\'êtes pas autorisé à accepter ce devis');
+
+    // Vérifier si le devis appartient bien au client
+    if (devis.client._id.toString() !== clientId.toString()) {
+      throw new Error('Vous n\'êtes pas autorisé à accepter ce devis.');
     }
 
-    if (devis.status !== 'en_attente' && devis.status !== 'termine') {
-        throw new Error('Ce devis ne peut plus être accepté (statut actuel: ' + devis.status + ')');
+    // Vérifier si le devis peut encore être accepté
+    if (devis.status !== 'termine') {
+        throw new Error('Ce devis ne peut plus être accepté car il n\'est pas finalisé.');
     }
-
-    if (devis.servicesChoisis.length === 0 && devis.packsChoisis.length === 0 && devis.lignesSupplementaires.length === 0) {
-      throw new Error('Le devis doit contenir au moins un service, un pack ou une ligne supplémentaire pour être accepté');
-    }
-
-    const existingReparation = await Reparation.model.findOne({ devisOrigine: devisId });
-    if (existingReparation) {
-        if (devis.status !== 'accepte') {
-            await this.repository.acceptDevis(devisId);
-        }
-        return {
-            message: 'Devis déjà accepté. Réparation déjà existante.',
-            reparationId: existingReparation._id // Retourner l'ID existant
-        };
-    }
-
-    // Générer les étapes initiales à partir des services, packs et lignes supplémentaires
-    let initialEtapes = [];
-    console.log('devis', devis.servicesChoisis);
     
-    // Ajouter les étapes depuis servicesChoisis
-    if (Array.isArray(devis.servicesChoisis)) {
-        devis.servicesChoisis
-            .filter(s => s && s.service && s.service.name) // Assurer que le service et son name sont présents
-            .forEach(s => {
-                initialEtapes.push({
-                    titre: s.service.name, // Utiliser le nom du service populé
-                    description: s.note || `Réaliser le service: ${s.service.name}`,
-                    status: 'En attente' // Statut initial pour une étape
-                });
-            });
-    }
+    // Mettre à jour le statut
+    devis.status = 'accepte';
+    devis.dateReponse = new Date();
+    await devis.save();
 
-    // Ajouter les étapes depuis packsChoisis
-    if (Array.isArray(devis.packsChoisis)) {
-        devis.packsChoisis
-            .filter(p => p && p.servicePack && p.servicePack.name) // Assurer que le pack et son name sont présents
-            .forEach(p => {
-                initialEtapes.push({
-                    titre: p.servicePack.name,
-                    description: p.note || `Réaliser le pack: ${p.servicePack.name}`,
-                    status: 'En attente'
-                });
-            });
-    }
-
-    // Traiter les lignes supplémentaires, en gérant le cas où elles sont stockées comme une chaîne JSON dans la BDD
-    let processedLignesSupplementaires = [];
-    if (Array.isArray(devis.lignesSupplementaires)) {
-        // Si c'est déjà un tableau (cas normal), on le prend tel quel
-        processedLignesSupplementaires = devis.lignesSupplementaires;
-    }
-
-    // Ajouter les étapes depuis le tableau traité lignesSupplementaires
-    processedLignesSupplementaires
-        .filter(l => l && typeof l.nom === 'string' && l.nom.trim() !== '') // Assurer que la ligne a un nom
-        .forEach(l => {
-            initialEtapes.push({
-                titre: l.nom,
-                description: l.note || 'Effectuer: ' + l.nom,
-                status: 'En attente'
-            });
+    // --- AJOUT NOTIFICATION POUR MANAGERS ---
+    try {
+        await NotificationService.createAndSendNotification({
+            // recipientId: null, // On ne met pas d'ID spécifique
+            recipientRole: 'manager', // Cible tous les managers
+            type: 'DEVIS_ACCEPTED',
+            message: `Le client ${devis.client.prenom} ${devis.client.nom} a accepté le devis N°${devisId.slice(-6)}.`, 
+            link: `/manager/devis/${devisId}`,
+            senderId: clientId, // ID du client
+            entityId: devisId
         });
+        console.log(`Notification DEVIS_ACCEPTED envoyée pour devis ${devisId}`);
+    } catch (notifError) {
+        console.error("Erreur lors de l'envoi de la notification DEVIS_ACCEPTED:", notifError);
+        // Ne pas bloquer l'opération principale si la notification échoue
+    }
+    // --- FIN NOTIFICATION ---
 
-    const reparationData = {
-        devisOrigine: devis._id,
-        client: devis.client,
-        vehicule: devis.vehicule,
-        mecaniciensAssignes: devis.mecaniciensTravaillant
-            .filter(mt => mt && mt.mecanicien && mt.mecanicien._id)
-            .map(mt => ({ mecanicien: mt.mecanicien._id })),
-        statusReparation: 'Planifiée', // Statut initial
-        servicesInclus: devis.servicesChoisis.map(s => ({ service: s.service._id, prix: s.prix, note: s.note })),
-        packsInclus: devis.packsChoisis.map(p => ({ servicePack: p.servicePack._id, prix: p.prix, note: p.note })),
-        problemeDeclare: devis.probleme,
-        etapesSuivi: initialEtapes, // Utiliser les étapes générées
-        photos: [], // Initialement vide
-        notesInternes: [],
-        dateDebutPrevue: devis.preferredDate, // Utiliser la date préférée du devis comme date prévue ?
-        // dateFinPrevue:  // A calculer ou définir plus tard
-        coutEstime: devis.total,
-    };
+    // Logique pour créer la réparation
+    // ...
 
-    // 4. Créer et sauvegarder la nouvelle réparation
-    const nouvelleReparation = new Reparation.model(reparationData);
-    await nouvelleReparation.save();
-
-    await this.repository.acceptDevis(devisId);
-
-
-    return {
-        message: 'Devis accepté avec succès et réparation planifiée.',
-        reparationId: nouvelleReparation._id
-    };
+    return { success: true, message: 'Devis accepté avec succès.' };
   }
   // refuser le devis
   async refuserDevis(devisId, clientId) {
-    // Vérifier que le devis existe
-    const devis = await this.repository.model.findById(devisId);
+    const devis = await this.repository.model.findById(devisId).populate('client', 'nom prenom');
     if (!devis) {
       throw new Error('Devis non trouvé');
     }
-
-    // Vérifier que le client est bien le propriétaire du devis
-    if (devis.client.toString() !== clientId.toString()) {
-      throw new Error('Vous n\'êtes pas autorisé à refuser ce devis');
+    if (devis.client._id.toString() !== clientId.toString()) {
+      throw new Error('Vous n\'êtes pas autorisé à refuser ce devis.');
     }
-
-    // Vérifier que le devis est en attente
-    if (devis.status !== 'en_attente') {
-      throw new Error('Ce devis ne peut plus être refusé');
+    if (devis.status !== 'termine') {
+        throw new Error('Ce devis ne peut plus être refusé car il n\'est pas finalisé.');
     }
+    
+    devis.status = 'refuse';
+    devis.dateReponse = new Date();
+    await devis.save();
 
-    // Refuser le devis
-    await DevisModel.declineDevis(devisId);
-    return { message: 'Devis refusé avec succès' };
+    // --- AJOUT NOTIFICATION POUR MANAGERS ---
+    try {
+        await NotificationService.createAndSendNotification({
+            recipientRole: 'manager',
+            type: 'DEVIS_REFUSED',
+            message: `Le client ${devis.client.prenom} ${devis.client.nom} a refusé le devis N°${devisId.slice(-6)}.`, 
+            link: `/manager/devis/${devisId}`,
+            senderId: clientId,
+            entityId: devisId
+        });
+        console.log(`Notification DEVIS_REFUSED envoyée pour devis ${devisId}`);
+    } catch (notifError) {
+        console.error("Erreur lors de l'envoi de la notification DEVIS_REFUSED:", notifError);
+    }
+    // --- FIN NOTIFICATION ---
+
+    return { success: true, message: 'Devis refusé avec succès.' };
   }
 
   // Récupérer tous les devis d'un client

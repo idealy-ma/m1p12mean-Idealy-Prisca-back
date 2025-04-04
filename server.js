@@ -7,11 +7,12 @@ const routes = require('./src/api/routes');
 const errorHandler = require('./src/api/middlewares/errorHandler');
 const AppError = require('./src/api/utils/AppError');
 const mongoose = require('mongoose');
-// --- AJOUTS POUR SOCKET.IO ---
 const http = require('http');
 const { Server } = require("socket.io");
 const DevisModel = require('./src/api/models/Devis'); // Importer le modèle Devis
-// --- FIN DES AJOUTS ---
+const NotificationService = require('./src/api/services/NotificationService');
+const jwt = require('jsonwebtoken');
+const User = require('./src/api/models/User'); // <<<--- AJOUT DE L'IMPORT USER
 
 // Initialiser l'application Express
 const app = express();
@@ -47,13 +48,80 @@ app.use(errorHandler);
 
 const httpServer = http.createServer(app);
 
+const corsOptions = {
+  origin: "*", // URL frontend Angular
+  methods: ["GET", "POST", "PATCH", "PUT", "DELETE"]
+};
+
+app.use(cors(corsOptions)); // Appliquer aux routes HTTP
+
 const io = new Server(httpServer, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"]
-  }
+  cors: corsOptions 
 });
 
+io.use((socket, next) => {
+    const token = socket.handshake.auth?.token; 
+    if (token) {
+        try {
+            const decoded = jwt.verify(token, config.jwt.secret);
+            if (!decoded.id) {
+                return next(new Error("Token invalide : ID utilisateur manquant."));
+            }
+            socket.userId = decoded.id; // Stocker l'ID utilisateur sur l'objet socket
+            console.log(`Authentification socket réussie pour user ${socket.userId}`);
+            next();
+        } catch (err) {
+            console.error("Erreur d'authentification Socket:", err.message);
+            next(new Error("Authentication error: " + err.message));
+        }
+    } else {
+        console.warn("Tentative de connexion socket sans token.");
+        next(new Error("Authentication error: Token manquant.")); 
+    }
+});
+
+io.on('connection', (socket) => {
+    // Vérifier si userId est bien défini après le middleware
+    if (!socket.userId) {
+        console.error(`Utilisateur connecté au socket principal ${socket.id} mais sans userId après middleware.`);
+        // Optionnel : déconnecter le socket s'il n'est pas authentifié correctement
+        // socket.disconnect(true);
+        return; 
+    }
+    
+    console.log(`Utilisateur ${socket.userId} connecté au socket principal ${socket.id}`);
+    
+    // Rejoindre la room privée basée sur l'ID utilisateur
+    const userRoom = `user_${socket.userId}`;
+    socket.join(userRoom);
+    console.log(`Socket ${socket.id} (User ${socket.userId}) a rejoint la room ${userRoom}`);
+
+    // Écouter l'événement pour récupérer le nombre de non lus (pour mise à jour initiale)
+    socket.on('get_unread_count', async () => {
+        try {
+            const count = await NotificationService.countUnread(socket.userId);
+            socket.emit('unread_count', count); // Renvoyer le compte au client demandeur
+        } catch (error) {
+            console.error(`Erreur récupération count pour user ${socket.userId}:`, error);
+            socket.emit('notification_error', { message: "Erreur interne lors de la récupération du nombre de notifications." });
+        }
+    });
+
+    socket.on('disconnect', (reason) => {
+        console.log(`Utilisateur ${socket.userId} déconnecté du socket principal ${socket.id}. Raison: ${reason}`);
+        // Quitte automatiquement les rooms
+    });
+
+    // Autres listeners globaux si nécessaire...
+});
+// --- FIN AUTH SOCKET.IO ---
+
+// --- INITIALISATION NOTIFICATION SERVICE --- 
+// Appeler init sur l'instance exportée
+NotificationService.init(io); 
+// --- FIN INITIALISATION ---
+
+// Espace de noms pour le chat des devis (EXISTANT)
 const devisChat = io.of("/devis-chat");
 
 devisChat.on("connection", (socket) => {
@@ -61,22 +129,40 @@ devisChat.on("connection", (socket) => {
 
   socket.on('join_devis_room', (devisId) => {
     socket.join(devisId);
-    console.log(`Socket ${socket.id} a rejoint la room ${devisId}`);
+    console.log(`Socket ${socket.id} a rejoint la room DEVIS ${devisId}`);
   });
 
   socket.on('send_message', async (data) => {
-     const { devisId, senderId, senderName, senderRole, message } = data;
+     // Attention: on ne devrait plus utiliser senderName envoyé par le client
+     // On va le récupérer via senderId
+     const { devisId, senderId, /* senderName, */ senderRole, message } = data; 
 
-     if (!devisId || !senderId || !senderName || !senderRole || !message) {
-         console.error("Données de message incomplètes reçues:", data);
+     // Validation de base (senderName n'est plus requis ici)
+     if (!devisId || !senderId || !senderRole || !message) {
+         console.error("Données de message incomplètes reçues (senderId, senderRole, message requis):", data);
          socket.emit('chat_error', { message: 'Données du message incomplètes.' });
          return;
      }
 
      try {
+       // Récupérer l'utilisateur expéditeur pour obtenir son nom fiable
+       let senderNameForDisplay = 'Utilisateur inconnu';
+       try {
+           const senderUser = await User.model.findById(senderId).select('nom prenom').lean().exec(); // Utiliser lean() pour un objet JS simple
+           if (senderUser) {
+               senderNameForDisplay = `${senderUser.prenom || ''} ${senderUser.nom || ''}`.trim();
+           } else {
+               console.warn(`send_message: Utilisateur expéditeur non trouvé pour ID: ${senderId}`);
+           }
+       } catch (userError) {
+           console.error(`send_message: Erreur récupération utilisateur ${senderId}:`, userError);
+           // Continuer avec 'Utilisateur inconnu'
+       }
+       
+       // Créer le nouveau message pour le stockage dans le devis
        const newMessage = {
          sender: senderId,
-         senderName: senderName, // Sauvegarder le nom
+         senderName: senderNameForDisplay, // Sauvegarder le nom récupéré
          senderRole: senderRole,
          message: message,
          timestamp: new Date()
@@ -86,18 +172,47 @@ devisChat.on("connection", (socket) => {
          devisId, 
          { $push: { chatMessages: newMessage } },
          { new: true, useFindAndModify: false }
-       );
+       ).populate('client', '_id'); // Populate client ID
 
        if (!updatedDevis) {
          socket.emit('chat_error', { message: `Devis non trouvé pour l'ID: ${devisId}` });
          return;
        }
 
+       // Émettre le message au chat (y compris à l'expéditeur)
+       // Note: newMessage contient maintenant le senderNameForDisplay récupéré
        devisChat.to(devisId).emit('receive_message', newMessage);
 
+       // --- Logique de Notification --- 
+       if (updatedDevis.client) { 
+           const recipientId = senderRole === 'client' ? null : updatedDevis.client._id; 
+           const recipientRoleForNotif = senderRole === 'client' ? 'manager' : null;
+           const recipientRoleForLink = senderRole === 'client' ? 'manager' : 'client';
+           
+           // Utiliser le nom récupéré pour le message de notification
+           const notificationMessage = `Nouveau message de ${senderNameForDisplay} dans le devis N°${devisId.slice(-6)}`; 
+           const notificationLink = `/${recipientRoleForLink}/devis/${devisId}`;
+           
+           console.log(`Préparation notif chat - Destinataire ID: ${recipientId}, Rôle: ${recipientRoleForNotif}`);
+           
+           await NotificationService.createAndSendNotification({
+              recipientId: recipientId,
+              recipientRole: recipientRoleForNotif,
+              type: 'NEW_CHAT_MESSAGE',
+              message: notificationMessage,
+              link: notificationLink,
+              senderId: senderId, // Garder l'ID de l'expéditeur original
+              entityId: devisId 
+           });
+           console.log(`Notification pour nouveau message chat tentée pour devis ${devisId}.`);
+       } else {
+           console.error(`Impossible d'envoyer la notification de chat: Client non trouvé pour devis ${devisId}`);
+       }
+       // --- FIN NOTIFICATION CHAT ---
+
      } catch (error) {
-       console.error(`Erreur lors de l'envoi/sauvegarde du message pour devis ${devisId}:`, error);
-       socket.emit('chat_error', { message: `Erreur serveur lors de l'envoi du message.` });
+       console.error(`Erreur dans send_message pour devis ${devisId}:`, error);
+       socket.emit('chat_error', { message: 'Erreur serveur lors de l\'envoi du message.' });
      }
   });
 

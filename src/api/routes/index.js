@@ -7,6 +7,7 @@ const reparationRoutes = require('./reparationRoutes');
 // Import facture routes
 const factureRoutes = require('./factureRoutes');
 const statistiqueRoutes = require('./statistiqueRoutes'); // Ajustez le chemin si nécessaire
+const notificationRoutes = require('./notificationRoutes'); // --- Importer les routes de notification ---
 
 // Importez d'autres routes ici au fur et à mesure que vous les créez
 
@@ -29,6 +30,10 @@ router.use('/reparations', reparationRoutes);
 
 // Use facture routes with /factures prefix
 router.use('/factures', factureRoutes);
+
+// --- Utiliser les routes de notification --- 
+router.use('/notifications', notificationRoutes);
+// --- Fin ajout ---
 
 // Route de test simple
 router.get('/', (req, res) => {
