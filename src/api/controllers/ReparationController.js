@@ -2,8 +2,13 @@ const ReparationService = require('../services/ReparationService');
 const mongoose = require('mongoose');
 const Vehicule = require('../models/Vehicule');
 const User = require('../models/User');
+const BaseController = require('./BaseController');
 
-class ReparationController {
+class ReparationController extends BaseController {
+
+  constructor() {
+    super(ReparationService);
+  }
 
   /**
    * Récupère les détails d'une réparation par son ID.
@@ -595,6 +600,58 @@ class ReparationController {
        if (error.message === 'Entité non trouvée') { // Erreur venant potentiellement de BaseService.update
          return res.status(404).json({ success: false, message: 'Réparation non trouvée lors de la mise à jour.', error: 'NOT_FOUND' });
        }
+      next(error);
+    }
+  }
+
+  /**
+   * Récupère l'historique des réparations pour le mécanicien connecté
+   * @param {Object} req - Requête Express
+   * @param {Object} res - Réponse Express
+   * @param {Object} next - Fonction next d'Express
+   */
+  getMechanicHistory = async (req, res, next) => {
+    try {
+      // Récupérer l'ID du mécanicien connecté
+      const mechanicId = req.user._id;
+
+      // Extraire les options de pagination/tri ET les nouveaux filtres de la requête
+      const { page = 1, limit = 10, sortField, sortOrder, searchTerm, dateDebut, dateFin } = req.query;
+      const options = {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        sort: {},
+        // Ajouter les filtres à l'objet options
+        searchTerm: searchTerm,
+        dateDebut: dateDebut,
+        dateFin: dateFin
+      };
+
+      if (sortField) {
+        options.sort[sortField] = sortOrder === 'desc' ? -1 : 1;
+      } else {
+        // Tri par défaut si non spécifié (devrait correspondre à celui du service)
+        options.sort = { dateFinReelle: -1, dateCreationReparation: -1 }; // Assurer la cohérence
+      }
+
+      // Appeler le service pour récupérer l'historique avec toutes les options
+      const result = await this.service.getReparationsHistoryForMechanic(mechanicId, options);
+
+      // Formater la réponse
+      res.status(200).json({
+        success: true,
+        message: 'Historique des réparations récupéré avec succès',
+        count: result.reparations.length,
+        total: result.pagination.total,
+        pagination: result.pagination,
+        data: result.reparations
+      });
+    } catch (error) {
+      // Gérer l'erreur spécifique d'ID invalide
+      if (error.message === 'ID du mécanicien invalide') {
+         return res.status(400).json({ success: false, message: error.message });
+      }
+      // Passer les autres erreurs au middleware
       next(error);
     }
   }

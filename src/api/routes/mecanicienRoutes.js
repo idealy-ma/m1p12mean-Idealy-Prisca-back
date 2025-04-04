@@ -22,6 +22,15 @@ router.get('/devis/:devisId/tasks', DevisController.getTasksForDevis);
 // Route pour obtenir les réparations "en cours" assignées au mécanicien
 router.get('/reparations/en-cours', ReparationController.getMecanicienReparationsEnCours);
 
+// Route pour récupérer les réparations assignées au mécanicien (Exemple, à adapter)
+// router.get('/reparations/assignees', ReparationController.getAssignedReparations);
+
+// *** Nouvelle Route pour l'historique ***
+router.get('/history', ReparationController.getMechanicHistory);
+
+// Route pour mettre à jour le statut d'une étape (Exemple, à adapter)
+// router.patch('/reparations/:reparationId/etapes/:etapeId/status', ReparationController.updateEtapeStatusByMechanic);
+
 // Par exemple, gestion des réparations, des rendez-vous, etc.
 router.get('/dashboard', (req, res) => {
   res.status(200).json({
